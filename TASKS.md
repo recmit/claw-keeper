@@ -2,9 +2,9 @@
 
 ## Next POC Hardening
 
-- [ ] Tighten the OpenClaw-specific mirror policy.
-  - Narrow or remove broad `agents/` mirroring.
-  - Exclude OpenClaw/Codex runtime caches, logs, shell snapshots, temporary files, and plugin caches.
+- [x] Tighten the OpenClaw-specific mirror policy.
+  - Mirror safe text from OpenClaw context directories such as `identity/`, `memory/`, `agents/`, `flows/`, and `tasks/`.
+  - Exclude OpenClaw/Codex runtime caches, logs, shell snapshots, temporary files, and plugin caches inside those directories.
   - Exclude auth/device identity files such as `identity/device-auth.json`.
   - Exclude SQLite sidecar files such as `*.sqlite-wal`, `*.sqlite-shm`, `*.db-wal`, and `*.db-shm`.
   - Prefer text-first monitoring by default; record excluded binary/database paths in manifests with reason, size, and hash where useful.
@@ -15,6 +15,11 @@
   - Commit and push only when the generated branch content changed.
 
 ## Future Enhancements
+
+- [ ] Classify OpenClaw runtime databases and binary assets.
+  - Determine which SQLite databases are canonical state versus cache/runtime state.
+  - Consider safe metadata-only summaries for excluded databases.
+  - Decide whether a future backup profile should opt into selected non-text assets.
 
 - [ ] Add restore planning and restore support.
   - Default to dry-run restore plans.

@@ -4,7 +4,13 @@ from pathlib import Path
 import pytest
 
 from claw_keeper.config import ConfigError, default_config_path, load_config, make_config, normalize_path, write_config
-from claw_keeper.policy import DEFAULT_BRANCH, DEFAULT_EXCLUDE_PATTERNS, DEFAULT_INCLUDE_PATHS
+from claw_keeper.policy import (
+    DEFAULT_BRANCH,
+    DEFAULT_EXCLUDE_PATTERNS,
+    DEFAULT_INCLUDE_PATHS,
+    LEGACY_BROAD_INCLUDE_PATHS,
+    NARROW_TEXT_INCLUDE_PATHS,
+)
 
 
 def test_default_config_path_uses_project_local_metadata_dir(tmp_path):
@@ -22,12 +28,25 @@ def test_make_config_expands_paths_and_applies_default_policy(tmp_path, monkeypa
     assert config.branch == DEFAULT_BRANCH
     assert config.include_paths == DEFAULT_INCLUDE_PATHS
     assert "workspace/" in config.include_paths
+    assert "agents/" in config.include_paths
+    assert "identity/" in config.include_paths
+    assert "memory/" in config.include_paths
+    assert "flows/" in config.include_paths
+    assert "tasks/" in config.include_paths
     assert "openclaw.json" in config.include_paths
     assert "." not in config.include_paths
     assert config.exclude_patterns == DEFAULT_EXCLUDE_PATTERNS
+    assert "agents/" not in config.exclude_patterns
+    assert "identity/" not in config.exclude_patterns
+    assert "memory/" not in config.exclude_patterns
+    assert "flows/" not in config.exclude_patterns
+    assert "tasks/" not in config.exclude_patterns
     assert "secrets/" in config.exclude_patterns
     assert "logs/" in config.exclude_patterns
+    assert "*.sqlite-wal" in config.exclude_patterns
+    assert "*auth*" in config.exclude_patterns
     assert config.remote is None
+    assert config.policy_version == 3
 
 
 def test_config_round_trip(tmp_path):
@@ -48,6 +67,55 @@ def test_config_round_trip(tmp_path):
 def test_make_config_rejects_blank_remote(tmp_path):
     with pytest.raises(ConfigError, match="remote"):
         make_config(str(tmp_path / "source"), str(tmp_path / "repo"), remote="")
+
+
+def test_load_config_migrates_legacy_broad_default_policy(tmp_path):
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source_path": str(tmp_path / "source"),
+                "repo_path": str(tmp_path / "repo"),
+                "branch": "raw-history",
+                "include_paths": list(LEGACY_BROAD_INCLUDE_PATHS),
+                "exclude_patterns": [".env"],
+                "remote": None,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_config(path)
+
+    assert config.include_paths == DEFAULT_INCLUDE_PATHS
+    assert config.exclude_patterns == DEFAULT_EXCLUDE_PATTERNS
+    assert config.policy_version == 3
+
+
+def test_load_config_migrates_narrow_text_default_policy(tmp_path):
+    path = tmp_path / "config.json"
+    path.write_text(
+        json.dumps(
+            {
+                "source_path": str(tmp_path / "source"),
+                "repo_path": str(tmp_path / "repo"),
+                "branch": "raw-history",
+                "include_paths": list(NARROW_TEXT_INCLUDE_PATHS),
+                "exclude_patterns": ["agents/", "identity/"],
+                "remote": None,
+                "policy_version": 2,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_config(path)
+
+    assert config.include_paths == DEFAULT_INCLUDE_PATHS
+    assert config.exclude_patterns == DEFAULT_EXCLUDE_PATTERNS
+    assert "agents/" not in config.exclude_patterns
+    assert "identity/" not in config.exclude_patterns
+    assert config.policy_version == 3
 
 
 def test_load_config_rejects_missing_file(tmp_path):

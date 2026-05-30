@@ -85,7 +85,7 @@ claw-keeper init \
   --remote git@github-claw-keeper-history:<owner>/openclaw-history.git
 ```
 
-Include paths are relative to `--source`. The default include policy starts with:
+Include paths are relative to `--source`. The default mirror policy is OpenClaw-aware and text-first. It starts from:
 
 ```text
 workspace/
@@ -99,7 +99,7 @@ skills/
 openclaw.json
 ```
 
-The default exclude policy includes risky or noisy state such as:
+Within those paths, Claw Keeper mirrors text files under a conservative size limit and records skipped files in `manifests/latest.json`. The default exclude policy avoids risky or noisy OpenClaw runtime state inside those trees, such as:
 
 ```text
 secrets/
@@ -108,15 +108,33 @@ completions/
 devices/
 npm/
 sessions/
+codex-home/
+cache/
+plugins/cache/
+shell_snapshots/
+tmp/
+identity/device-auth.json
 *.sqlite
+*.sqlite-*
+*.sqlite-wal
+*.sqlite-shm
 *.db
+*.db-*
+*.wal
+*.shm
 *.pem
 *.key
 id_rsa
 id_ed25519
+*auth*
+*token*
+*secret*
+*credential*
 openclaw.json.bak*
 openclaw.json.last-good
 ```
+
+See `docs/MIRROR_RISK_MODEL.md` for the current monitoring-first risk model and the limits of text-first mirroring.
 
 Check the setup:
 

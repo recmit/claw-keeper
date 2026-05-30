@@ -1,4 +1,5 @@
 import pytest
+import json
 
 from claw_keeper.cli import main
 from claw_keeper.config import load_config
@@ -146,3 +147,64 @@ def test_snapshot_skips_symlinks(tmp_path, monkeypatch, capsys):
     capsys.readouterr()
     assert result == 0
     assert not (repo / "workspace" / "outside-link").exists()
+
+
+def test_snapshot_uses_openclaw_text_first_policy(tmp_path, monkeypatch, capsys):
+    source, repo, config_path = init_fixture(tmp_path, monkeypatch)
+    (source / "openclaw.json").write_text('{"workspace":"ok"}\n', encoding="utf-8")
+    (source / "agents" / "main" / "agent" / "codex-home").mkdir(parents=True)
+    (source / "agents" / "main" / "agent" / "codex-home" / "logs_2.sqlite-wal").write_bytes(b"db")
+    (source / "agents" / "main" / "notes.md").write_text("agent notes\n", encoding="utf-8")
+    (source / "identity").mkdir()
+    (source / "identity" / "profile.md").write_text("public identity notes\n", encoding="utf-8")
+    (source / "identity" / "device-auth.json").write_text('{"token":"nope"}\n', encoding="utf-8")
+    (source / "memory").mkdir()
+    (source / "memory" / "reflection.md").write_text("memory notes\n", encoding="utf-8")
+    (source / "flows").mkdir()
+    (source / "flows" / "handoff.md").write_text("flow notes\n", encoding="utf-8")
+    (source / "tasks").mkdir()
+    (source / "tasks" / "task.md").write_text("task notes\n", encoding="utf-8")
+    (source / "tasks" / "runs.sqlite-shm").write_bytes(b"db")
+    (source / "workspace" / "image.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+    (source / "workspace" / "notes.md").write_text("safe text\n", encoding="utf-8")
+
+    result = main(["snapshot", "--reason", "manual", "--config", str(config_path)])
+
+    capsys.readouterr()
+    assert result == 0
+    assert (repo / "workspace" / "notes.md").exists()
+    assert (repo / "openclaw.json").exists()
+    assert (repo / "agents" / "main" / "notes.md").exists()
+    assert (repo / "identity" / "profile.md").exists()
+    assert (repo / "memory" / "reflection.md").exists()
+    assert (repo / "flows" / "handoff.md").exists()
+    assert (repo / "tasks" / "task.md").exists()
+    assert not (repo / "agents" / "main" / "agent" / "codex-home").exists()
+    assert not (repo / "identity" / "device-auth.json").exists()
+    assert not (repo / "tasks" / "runs.sqlite-shm").exists()
+    assert not (repo / "workspace" / "image.png").exists()
+
+    manifest = json.loads((repo / "manifests" / "latest.json").read_text(encoding="utf-8"))
+    assert manifest["policy_version"] == 3
+    skipped = {item["path"]: item["reason"] for item in manifest["skipped"]}
+    assert skipped["agents/main/agent/codex-home"] == "excluded-pattern"
+    assert skipped["identity/device-auth.json"] == "excluded-pattern"
+    assert skipped["tasks/runs.sqlite-shm"] == "excluded-pattern"
+    assert skipped["workspace/image.png"] == "non-text-extension"
+
+
+def test_snapshot_prunes_paths_from_legacy_broad_policy(tmp_path, monkeypatch, capsys):
+    source, repo, config_path = init_fixture(tmp_path, monkeypatch)
+    (source / "agents" / "main").mkdir(parents=True)
+    (source / "agents" / "main" / "notes.md").write_text("safe now\n", encoding="utf-8")
+    (repo / "agents" / "main").mkdir(parents=True)
+    (repo / "agents" / "main" / "old.log").write_text("old\n", encoding="utf-8")
+    run_git(["add", "-A"], repo)
+    run_git(["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "legacy broad mirror"], repo)
+
+    result = main(["snapshot", "--reason", "prune", "--config", str(config_path)])
+
+    capsys.readouterr()
+    assert result == 0
+    assert not (repo / "agents" / "main" / "old.log").exists()
+    assert (repo / "agents" / "main" / "notes.md").exists()

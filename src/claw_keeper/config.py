@@ -9,7 +9,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
-from .policy import DEFAULT_BRANCH, DEFAULT_EXCLUDE_PATTERNS, DEFAULT_INCLUDE_PATHS
+from .policy import (
+    DEFAULT_BRANCH,
+    DEFAULT_EXCLUDE_PATTERNS,
+    DEFAULT_INCLUDE_PATHS,
+    LEGACY_BROAD_INCLUDE_PATHS,
+    NARROW_TEXT_INCLUDE_PATHS,
+    POLICY_VERSION,
+)
 
 
 class ConfigError(Exception):
@@ -24,6 +31,7 @@ class KeeperConfig:
     include_paths: Tuple[str, ...] = DEFAULT_INCLUDE_PATHS
     exclude_patterns: Tuple[str, ...] = DEFAULT_EXCLUDE_PATTERNS
     remote: Optional[str] = None
+    policy_version: int = POLICY_VERSION
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -33,6 +41,7 @@ class KeeperConfig:
             "include_paths": list(self.include_paths),
             "exclude_patterns": list(self.exclude_patterns),
             "remote": self.remote,
+            "policy_version": self.policy_version,
         }
 
     @classmethod
@@ -46,14 +55,30 @@ class KeeperConfig:
         if not isinstance(branch, str) or not branch.strip():
             raise ConfigError("branch must be a non-empty string")
 
+        policy_version = data.get("policy_version")
+        if policy_version is None:
+            policy_version = 1
+        if not isinstance(policy_version, int) or policy_version < 1:
+            raise ConfigError("policy_version must be a positive integer")
+
         include_paths = _string_tuple(
             data.get("include_paths", DEFAULT_INCLUDE_PATHS),
             "include_paths",
         )
+        migrated_default_policy = policy_version < POLICY_VERSION and include_paths in (
+            LEGACY_BROAD_INCLUDE_PATHS,
+            NARROW_TEXT_INCLUDE_PATHS,
+        )
+        if migrated_default_policy:
+            include_paths = DEFAULT_INCLUDE_PATHS
+            policy_version = POLICY_VERSION
+
         exclude_patterns = _string_tuple(
             data.get("exclude_patterns", DEFAULT_EXCLUDE_PATTERNS),
             "exclude_patterns",
         )
+        if migrated_default_policy:
+            exclude_patterns = DEFAULT_EXCLUDE_PATTERNS
 
         remote = data.get("remote")
         if remote is not None and not isinstance(remote, str):
@@ -66,6 +91,7 @@ class KeeperConfig:
             include_paths=include_paths,
             exclude_patterns=exclude_patterns,
             remote=remote,
+            policy_version=policy_version,
         )
 
 

@@ -9,9 +9,10 @@ from pathlib import Path
 from typing import Dict, Optional
 
 from .config import KeeperConfig
-from .matching import is_excluded, normalize_relative_path, path_to_posix
+from .matching import normalize_relative_path, path_to_posix
+from .mirror import classify_path
 from .runtime import RuntimeState
-from .snapshot import SnapshotResult, run_snapshot
+from .snapshot import run_snapshot
 
 
 def run_watch(
@@ -68,16 +69,14 @@ def scan_source_state(config: KeeperConfig) -> Dict[str, str]:
             continue
         if source.is_file():
             rel = path_to_posix(source.relative_to(source_root))
-            if not is_excluded(rel, config.exclude_patterns):
+            if classify_path(source, rel, config.exclude_patterns).include:
                 state[rel] = _file_signature(source)
             continue
         for path in sorted(source.rglob("*")):
             if path.is_symlink():
                 continue
             rel = path_to_posix(path.relative_to(source_root))
-            if is_excluded(rel, config.exclude_patterns, is_dir=path.is_dir()):
-                continue
-            if path.is_file():
+            if path.is_file() and classify_path(path, rel, config.exclude_patterns).include:
                 state[rel] = _file_signature(path)
     return state
 

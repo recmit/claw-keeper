@@ -30,6 +30,37 @@ def test_watch_detects_change_and_commits(tmp_path, monkeypatch):
     assert run_git(["rev-parse", "--verify", "HEAD"], repo)
 
 
+def test_watch_ignores_excluded_runtime_changes(tmp_path, monkeypatch):
+    source, repo, config_path = init_fixture(tmp_path, monkeypatch)
+    config = load_config(config_path)
+
+    run_watch(config, debounce=0, interval=0, max_iterations=1)
+    (source / "agents" / "main" / "agent" / "codex-home").mkdir(parents=True)
+    (source / "agents" / "main" / "agent" / "codex-home" / "logs_2.sqlite-wal").write_bytes(b"db")
+    run_watch(config, debounce=0, interval=0, max_iterations=1)
+
+    assert not (repo / "agents").exists()
+    try:
+        run_git(["rev-parse", "--verify", "HEAD"], repo)
+        committed = True
+    except Exception:
+        committed = False
+    assert not committed
+
+
+def test_watch_detects_safe_openclaw_context_change(tmp_path, monkeypatch):
+    source, repo, config_path = init_fixture(tmp_path, monkeypatch)
+    config = load_config(config_path)
+
+    run_watch(config, debounce=0, interval=0, max_iterations=1)
+    (source / "agents" / "main").mkdir(parents=True)
+    (source / "agents" / "main" / "notes.md").write_text("agent note\n", encoding="utf-8")
+    run_watch(config, debounce=0, interval=0, max_iterations=1)
+
+    assert (repo / "agents" / "main" / "notes.md").read_text(encoding="utf-8") == "agent note\n"
+    assert run_git(["rev-parse", "--verify", "HEAD"], repo)
+
+
 def test_install_systemd_dry_run_emits_service(tmp_path, monkeypatch, capsys):
     _source, _repo, config_path = init_fixture(tmp_path, monkeypatch)
     capsys.readouterr()

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import uuid
 from dataclasses import dataclass, field
@@ -21,7 +22,9 @@ from .git import (
     staged_name_status,
     working_tree_porcelain,
 )
-from .matching import is_excluded, is_managed_repo_path, normalize_relative_path, path_to_posix, status_paths
+from .matching import is_managed_repo_path, normalize_relative_path, path_to_posix, status_paths
+from .mirror import classify_path, skipped_entry
+from .policy import DEFAULT_PRUNE_PATHS
 from .risk import RiskFinding, has_high_risk, render_report, scan_tree, summarize_findings
 from .runtime import RuntimeState, SnapshotLock
 
@@ -176,7 +179,7 @@ def _ensure_no_unmanaged_dirty_paths(config: KeeperConfig) -> None:
     unmanaged = []
     for line in dirty:
         for path in status_paths(line):
-            if path and not is_managed_repo_path(path, config.include_paths):
+            if path and not is_managed_repo_path(path, _managed_paths_for_cleanup(config)):
                 unmanaged.append(path)
     if unmanaged:
         raise SnapshotError(
@@ -190,6 +193,7 @@ def _build_staging_tree(config: KeeperConfig, state: RuntimeState) -> Path:
     staging_root.mkdir(parents=True, exist_ok=False)
     source_root = Path(config.source_path)
     entries = []
+    skipped = []
     missing_includes = []
 
     for include in config.include_paths:
@@ -199,10 +203,11 @@ def _build_staging_tree(config: KeeperConfig, state: RuntimeState) -> Path:
             missing_includes.append(relative)
             continue
         destination = staging_root if relative == "." else staging_root / relative
-        copied = _copy_source_path(source_root, source, destination, staging_root, config.exclude_patterns)
+        copied, skipped_paths = _copy_source_path(source_root, source, destination, staging_root, config.exclude_patterns)
         entries.extend(copied)
+        skipped.extend(skipped_paths)
 
-    _write_manifest(staging_root, config, entries, missing_includes)
+    _write_manifest(staging_root, config, entries, skipped, missing_includes)
     return staging_root
 
 
@@ -212,35 +217,43 @@ def _copy_source_path(
     destination: Path,
     staging_root: Path,
     excludes: Sequence[str],
-) -> List[dict]:
+) -> tuple[List[dict], List[dict]]:
     copied = []
+    skipped = []
     relative = path_to_posix(source.relative_to(source_root))
-    if is_excluded(relative, excludes, is_dir=source.is_dir()):
-        return copied
-    if source.is_symlink():
-        return copied
+    decision = classify_path(source, relative, excludes, is_dir=source.is_dir())
+    if not decision.include:
+        return copied, [skipped_entry(source, relative, decision.reason)]
     if source.is_file():
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(str(source), str(destination), follow_symlinks=False)
-        return [_manifest_entry_for_file(destination, destination.relative_to(staging_root))]
+        return [_manifest_entry_for_file(destination, destination.relative_to(staging_root))], skipped
 
-    for child in sorted(source.rglob("*")):
-        if child.is_symlink():
-            continue
-        child_relative = path_to_posix(child.relative_to(source_root))
-        if is_excluded(child_relative, excludes, is_dir=child.is_dir()):
-            if child.is_dir():
+    for root, dirs, files in os.walk(source, topdown=True, followlinks=False):
+        root_path = Path(root)
+        kept_dirs = []
+        for dirname in sorted(dirs):
+            child = root_path / dirname
+            child_relative = path_to_posix(child.relative_to(source_root))
+            child_decision = classify_path(child, child_relative, excludes, is_dir=True)
+            if child_decision.include:
+                kept_dirs.append(dirname)
+            else:
+                skipped.append(skipped_entry(child, child_relative, child_decision.reason))
+        dirs[:] = kept_dirs
+
+        for filename in sorted(files):
+            child = root_path / filename
+            child_relative = path_to_posix(child.relative_to(source_root))
+            child_decision = classify_path(child, child_relative, excludes)
+            if not child_decision.include:
+                skipped.append(skipped_entry(child, child_relative, child_decision.reason))
                 continue
-            continue
-        child_destination = destination / child.relative_to(source)
-        if child.is_dir():
-            child_destination.mkdir(parents=True, exist_ok=True)
-            continue
-        if child.is_file():
+            child_destination = destination / child.relative_to(source)
             child_destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(str(child), str(child_destination), follow_symlinks=False)
             copied.append(_manifest_entry_for_file(child_destination, child_destination.relative_to(staging_root)))
-    return copied
+    return copied, skipped
 
 
 def _manifest_entry_for_file(path: Path, relative: Path) -> dict:
@@ -253,14 +266,23 @@ def _manifest_entry_for_file(path: Path, relative: Path) -> dict:
     }
 
 
-def _write_manifest(staging_root: Path, config: KeeperConfig, entries: Iterable[dict], missing_includes: Sequence[str]) -> None:
+def _write_manifest(
+    staging_root: Path,
+    config: KeeperConfig,
+    entries: Iterable[dict],
+    skipped: Iterable[dict],
+    missing_includes: Sequence[str],
+) -> None:
     manifest = {
         "version": 1,
+        "policy_version": config.policy_version,
         "source_path": config.source_path,
         "include_paths": list(config.include_paths),
         "exclude_patterns": list(config.exclude_patterns),
+        "prune_paths": list(DEFAULT_PRUNE_PATHS),
         "missing_includes": sorted(missing_includes),
         "files": sorted(entries, key=lambda item: item["path"]),
+        "skipped": sorted(skipped, key=lambda item: item["path"]),
     }
     manifest_path = staging_root / "manifests" / "latest.json"
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
@@ -269,7 +291,7 @@ def _write_manifest(staging_root: Path, config: KeeperConfig, entries: Iterable[
 
 def _apply_staging_tree(config: KeeperConfig, staging_root: Path) -> None:
     repo_path = Path(config.repo_path)
-    for include in config.include_paths:
+    for include in _managed_paths_for_cleanup(config):
         relative = normalize_relative_path(include)
         if relative == ".":
             _remove_repo_contents(repo_path)
@@ -299,7 +321,7 @@ def _copy_tree_contents(source: Path, destination: Path) -> None:
         target = destination / relative
         if item.is_dir():
             target.mkdir(parents=True, exist_ok=True)
-        elif item.is_file() or item.is_symlink():
+        elif item.is_file() and not item.is_symlink():
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(str(item), str(target), follow_symlinks=False)
 
@@ -352,4 +374,10 @@ def _changed_files_from_name_status(lines: Sequence[str]) -> List[str]:
 
 
 def _list_tree_files(root: Path) -> List[str]:
-    return sorted(path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file())
+    return sorted(path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file() and not path.is_symlink())
+
+
+def _managed_paths_for_cleanup(config: KeeperConfig) -> tuple[str, ...]:
+    configured = tuple(config.include_paths)
+    extras = tuple(path for path in DEFAULT_PRUNE_PATHS if path not in configured)
+    return configured + extras
