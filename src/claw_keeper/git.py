@@ -77,6 +77,36 @@ def working_tree_porcelain(path: Path) -> List[str]:
     return output.splitlines()
 
 
+def add_all(path: Path) -> None:
+    run_git(["add", "-A"], path)
+
+
+def staged_name_status(path: Path) -> List[str]:
+    output = run_git(["diff", "--cached", "--name-status"], path)
+    if not output:
+        return []
+    return output.splitlines()
+
+
+def commit_with_message(path: Path, message_file: Path) -> str:
+    return run_git(
+        [
+            "-c",
+            "user.name=Claw Keeper",
+            "-c",
+            "user.email=claw-keeper@localhost",
+            "commit",
+            "-F",
+            str(message_file),
+        ],
+        path,
+    )
+
+
+def push(path: Path, remote: str, branch: str) -> None:
+    run_git(["push", remote, branch], path)
+
+
 def latest_commit_subject(path: Path) -> Optional[str]:
     if not has_commits(path):
         return None

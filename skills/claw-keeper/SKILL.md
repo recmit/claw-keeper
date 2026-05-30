@@ -92,18 +92,41 @@ Check status:
 claw-keeper status
 ```
 
+Create the first snapshot:
+
+```bash
+claw-keeper snapshot --reason initial --push
+```
+
+Install the restartable watcher service:
+
+```bash
+claw-keeper install-systemd --dry-run --push --debounce 60
+claw-keeper install-systemd --apply --push --debounce 60
+systemctl --user daemon-reload
+systemctl --user enable --now claw-keeper-watch
+```
+
+When testing upgraded versions of the tool, restart the service after upgrading:
+
+```bash
+uv tool upgrade claw-keeper
+systemctl --user restart claw-keeper-watch
+```
+
 ## Current Command Support
 
 Implemented now:
 
 - `claw-keeper init`
 - `claw-keeper status`
+- `claw-keeper snapshot`
+- `claw-keeper watch`
+- `claw-keeper install-systemd`
 
 Not implemented yet:
 
-- `claw-keeper snapshot`
-- `claw-keeper watch`
 - `claw-keeper restore-plan`
 - `claw-keeper restore`
 
-If the user asks to snapshot or restore before those commands exist, explain that the installed version does not support them yet and suggest checking `claw-keeper --help`.
+If the user asks to restore before those commands exist, explain that the installed version does not support restore yet and suggest checking `claw-keeper --help`.

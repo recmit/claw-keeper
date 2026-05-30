@@ -112,7 +112,8 @@ def test_status_works_before_any_commits(tmp_path, capsys):
     assert "Included paths: workspace/" in captured.out
     assert "Current branch: raw-history" in captured.out
     assert "Latest commit: none yet" in captured.out
-    assert "Not implemented yet: snapshot, watch, restore-plan, restore" in captured.out
+    assert "Implemented commands: init, status, snapshot, watch, install-systemd" in captured.out
+    assert "Not implemented yet: restore-plan, restore" in captured.out
 
 
 def test_status_reports_missing_config_cleanly(tmp_path, capsys):

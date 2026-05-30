@@ -124,6 +124,34 @@ Check the setup:
 claw-keeper status
 ```
 
+Create the first deterministic snapshot and push it:
+
+```bash
+claw-keeper snapshot --reason initial --push
+```
+
+For foreground testing, start the polling watcher:
+
+```bash
+claw-keeper watch --debounce 60 --interval 5 --push
+```
+
+For a restartable user service, preview and install the systemd unit:
+
+```bash
+claw-keeper install-systemd --dry-run --push --debounce 60
+claw-keeper install-systemd --apply --push --debounce 60
+systemctl --user daemon-reload
+systemctl --user enable --now claw-keeper-watch
+```
+
+The service uses `Restart=always`. After upgrading the tool on the VM, restart the watcher so it uses the new code:
+
+```bash
+uv tool upgrade claw-keeper
+systemctl --user restart claw-keeper-watch
+```
+
 ## Current MVP Status
 
 Implemented:
@@ -131,18 +159,19 @@ Implemented:
 ```text
 claw-keeper init
 claw-keeper status
+claw-keeper snapshot
+claw-keeper watch
+claw-keeper install-systemd
 ```
 
 Not implemented yet:
 
 ```text
-claw-keeper snapshot
-claw-keeper watch
 claw-keeper restore-plan
 claw-keeper restore
 ```
 
-When snapshot support lands, pushes should use the configured private remote and the dedicated SSH key above.
+Snapshots use a deterministic no-LLM commit message in the current POC. Pushes use the configured private remote and the dedicated SSH key above.
 
 ## Optional OpenClaw Skill
 
