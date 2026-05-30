@@ -1,0 +1,23 @@
+[project]
+name = "claw-keeper"
+version = "0.1.0"
+description = "Git-backed evolution history for safe OpenClaw state."
+readme = "IDEA.md"
+requires-python = ">=3.8"
+dependencies = []
+
+[project.scripts]
+claw-keeper = "claw_keeper.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=7.4,<8",
+]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
