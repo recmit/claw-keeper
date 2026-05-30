@@ -20,7 +20,13 @@ uv tool install -e .
 From a public Git repo:
 
 ```bash
-uv tool install git+https://github.com/<owner>/claw-keeper
+uv tool install "git+ssh://git@github.com/recmit/claw-keeper.git"
+```
+
+Public tool repository:
+
+```text
+git@github.com:recmit/claw-keeper.git
 ```
 
 ## Create the Private History Repo
@@ -137,3 +143,27 @@ claw-keeper restore
 ```
 
 When snapshot support lands, pushes should use the configured private remote and the dedicated SSH key above.
+
+## Optional OpenClaw Skill
+
+This repo includes an OpenClaw skill at:
+
+```text
+skills/claw-keeper/SKILL.md
+```
+
+Install or copy that skill into OpenClaw when you want an agent to guide the setup. The skill tells OpenClaw to ask for the private history repo URI and then run the install/init flow using this public tool repo:
+
+```text
+git@github.com:recmit/claw-keeper.git
+```
+
+Example install from the OpenClaw VM:
+
+```bash
+git clone git@github.com:recmit/claw-keeper.git /tmp/claw-keeper
+mkdir -p ~/.openclaw/workspace/skills
+cp -R /tmp/claw-keeper/skills/claw-keeper ~/.openclaw/workspace/skills/
+```
+
+Then ask OpenClaw to use the Claw Keeper skill to install and configure Claw Keeper.
