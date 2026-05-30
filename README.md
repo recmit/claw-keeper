@@ -181,18 +181,18 @@ This repo includes an OpenClaw skill at:
 skills/claw-keeper/SKILL.md
 ```
 
-Install or copy that skill into OpenClaw when you want an agent to guide the setup. The skill tells OpenClaw to ask for the private history repo URI and then run the install/init flow using this public tool repo:
+Install the skill into OpenClaw when you want an agent to guide the setup. The skill tells OpenClaw to ask for the private history repo URI and then run the install/init flow using this public tool repo:
 
 ```text
 git@github.com:recmit/claw-keeper.git
 ```
 
-Example install from the OpenClaw VM:
+The OpenClaw skill installer expects `SKILL.md` at the root of a Git archive, so this repo publishes a dedicated skill branch:
 
 ```bash
-git clone git@github.com:recmit/claw-keeper.git /tmp/claw-keeper
-mkdir -p ~/.openclaw/workspace/skills
-cp -R /tmp/claw-keeper/skills/claw-keeper ~/.openclaw/workspace/skills/
+openclaw skills install git:recmit/claw-keeper@openclaw-skill --as claw-keeper --force
 ```
+
+The canonical skill source still lives in `skills/claw-keeper/SKILL.md` on `main`; the `openclaw-skill` branch exists only to make Git-based skill installation straightforward.
 
 Then ask OpenClaw to use the Claw Keeper skill to install and configure Claw Keeper.
