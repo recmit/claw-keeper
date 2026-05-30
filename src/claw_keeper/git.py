@@ -83,6 +83,28 @@ def latest_commit_subject(path: Path) -> Optional[str]:
     return run_git(["log", "-1", "--pretty=format:%h %s"], path)
 
 
+def remote_url(path: Path, name: str = "origin") -> Optional[str]:
+    try:
+        return run_git(["remote", "get-url", name], path)
+    except GitError:
+        return None
+
+
+def ensure_remote(path: Path, url: str, name: str = "origin") -> None:
+    existing = remote_url(path, name)
+    if existing == url:
+        return
+    if existing is not None:
+        raise GitError(
+            "remote {0} already points to {1}; refusing to replace it with {2}".format(
+                name,
+                existing,
+                url,
+            )
+        )
+    run_git(["remote", "add", name, url], path)
+
+
 def write_default_gitignore(path: Path, lines: Sequence[str]) -> None:
     gitignore = path / ".gitignore"
     existing = []

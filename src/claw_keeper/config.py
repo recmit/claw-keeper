@@ -78,11 +78,19 @@ def normalize_path(path: str) -> str:
     return os.path.abspath(os.path.expanduser(path))
 
 
-def make_config(source_path: str, repo_path: str, branch: str = DEFAULT_BRANCH) -> KeeperConfig:
+def make_config(
+    source_path: str,
+    repo_path: str,
+    branch: str = DEFAULT_BRANCH,
+    remote: Optional[str] = None,
+) -> KeeperConfig:
+    if remote is not None and not remote.strip():
+        raise ConfigError("remote must be a non-empty string when provided")
     return KeeperConfig(
         source_path=normalize_path(source_path),
         repo_path=normalize_path(repo_path),
         branch=branch,
+        remote=remote,
     )
 
 

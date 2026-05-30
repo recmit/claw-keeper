@@ -21,18 +21,33 @@ def test_make_config_expands_paths_and_applies_default_policy(tmp_path, monkeypa
     assert Path(config.repo_path).is_absolute()
     assert config.branch == DEFAULT_BRANCH
     assert config.include_paths == DEFAULT_INCLUDE_PATHS
+    assert "workspace/" in config.include_paths
+    assert "openclaw.json" in config.include_paths
+    assert "." not in config.include_paths
     assert config.exclude_patterns == DEFAULT_EXCLUDE_PATTERNS
+    assert "secrets/" in config.exclude_patterns
+    assert "logs/" in config.exclude_patterns
     assert config.remote is None
 
 
 def test_config_round_trip(tmp_path):
     path = tmp_path / "keeper" / "config.json"
-    config = make_config(str(tmp_path / "source"), str(tmp_path / "repo"), "raw-history")
+    config = make_config(
+        str(tmp_path / "source"),
+        str(tmp_path / "repo"),
+        "raw-history",
+        remote="git@github-claw-keeper-history:example/openclaw-history.git",
+    )
 
     write_config(path, config)
     loaded = load_config(path)
 
     assert loaded == config
+
+
+def test_make_config_rejects_blank_remote(tmp_path):
+    with pytest.raises(ConfigError, match="remote"):
+        make_config(str(tmp_path / "source"), str(tmp_path / "repo"), remote="")
 
 
 def test_load_config_rejects_missing_file(tmp_path):

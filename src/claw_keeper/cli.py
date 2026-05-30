@@ -12,9 +12,11 @@ from .git import (
     GitError,
     current_branch,
     ensure_branch,
+    ensure_remote,
     init_repo,
     is_git_repo,
     latest_commit_subject,
+    remote_url,
     working_tree_porcelain,
     write_default_gitignore,
 )
@@ -26,9 +28,10 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     init_parser = subparsers.add_parser("init", help="initialize Claw Keeper config and history repo")
-    init_parser.add_argument("--source", required=True, help="OpenClaw source state path")
+    init_parser.add_argument("--source", required=True, help="OpenClaw state root, usually ~/.openclaw")
     init_parser.add_argument("--repo", required=True, help="Git history repo path")
     init_parser.add_argument("--branch", default=DEFAULT_BRANCH, help="history branch name")
+    init_parser.add_argument("--remote", help="private history repo remote URL to configure as origin")
     init_parser.add_argument("--config", help="config file path")
     init_parser.set_defaults(handler=handle_init)
 
@@ -51,11 +54,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 def handle_init(args: argparse.Namespace) -> int:
     config_path = _config_path(args.config)
-    config = make_config(args.source, args.repo, args.branch)
+    config = make_config(args.source, args.repo, args.branch, remote=args.remote)
     repo_path = Path(config.repo_path)
 
     init_repo(repo_path)
     ensure_branch(repo_path, config.branch)
+    if config.remote:
+        ensure_remote(repo_path, config.remote)
     write_default_gitignore(repo_path, DEFAULT_GITIGNORE_LINES)
     write_config(config_path, config)
 
@@ -64,6 +69,8 @@ def handle_init(args: argparse.Namespace) -> int:
     print("Source: {0}".format(config.source_path))
     print("History repo: {0}".format(config.repo_path))
     print("Branch: {0}".format(config.branch))
+    print("Remote: {0}".format(config.remote or "not configured"))
+    print("Included paths are relative to source.")
     return 0
 
 
@@ -81,18 +88,22 @@ def handle_status(args: argparse.Namespace) -> int:
     print("Source:")
     print("  Path: {0}".format(config.source_path))
     print("  Exists: {0}".format(_yes_no(source_path.exists())))
+    print("  Included paths: {0}".format(", ".join(config.include_paths)))
     print("")
     print("History repo:")
     print("  Path: {0}".format(config.repo_path))
     print("  Exists: {0}".format(_yes_no(repo_exists)))
     print("  Git repo: {0}".format(_yes_no(git_repo)))
     print("  Configured branch: {0}".format(config.branch))
+    print("  Configured remote: {0}".format(config.remote or "not configured"))
 
     if git_repo:
         branch = current_branch(repo_path) or "<detached>"
         changes = working_tree_porcelain(repo_path)
         latest = latest_commit_subject(repo_path)
+        origin = remote_url(repo_path) or "not configured"
         print("  Current branch: {0}".format(branch))
+        print("  Git origin: {0}".format(origin))
         print("  Working tree: {0}".format("clean" if not changes else "dirty ({0} changes)".format(len(changes))))
         print("  Latest commit: {0}".format(latest or "none yet"))
     else:
