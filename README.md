@@ -193,6 +193,6 @@ The OpenClaw skill installer expects `SKILL.md` at the root of a Git archive, so
 openclaw skills install git:recmit/claw-keeper@openclaw-skill --as claw-keeper --force
 ```
 
-The canonical skill source still lives in `skills/claw-keeper/SKILL.md` on `main`; the `openclaw-skill` branch exists only to make Git-based skill installation straightforward.
+The canonical skill source still lives in `skills/claw-keeper/SKILL.md` on `main`; the `openclaw-skill` branch exists only to make Git-based skill installation straightforward. A GitHub Action syncs the canonical skill into root `SKILL.md` on that branch when the skill changes on `main`.
 
 Then ask OpenClaw to use the Claw Keeper skill to install and configure Claw Keeper.

@@ -1,0 +1,59 @@
+name: Sync OpenClaw Skill Branch
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - skills/claw-keeper/**
+      - .github/workflows/sync-openclaw-skill.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-openclaw-skill-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate canonical skill
+        run: test -f skills/claw-keeper/SKILL.md
+
+      - name: Prepare generated skill
+        run: cp skills/claw-keeper/SKILL.md /tmp/SKILL.md
+
+      - name: Sync root SKILL.md to openclaw-skill
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin openclaw-skill || true
+          if git show-ref --verify --quiet refs/remotes/origin/openclaw-skill; then
+            git switch --force-create openclaw-skill origin/openclaw-skill
+          else
+            git switch --orphan openclaw-skill
+            git rm -rf . || true
+          fi
+
+          cp /tmp/SKILL.md SKILL.md
+          git add SKILL.md
+
+          if git diff --cached --quiet; then
+            echo "openclaw-skill is already up to date."
+            exit 0
+          fi
+
+          git commit -m "Sync OpenClaw skill from main"
+          git push origin openclaw-skill
