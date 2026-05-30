@@ -23,7 +23,9 @@ Before running install or init commands, ask the user for:
 - Local history repo path, default `~/openclaw-history`
 - Whether a dedicated SSH key already exists for the private history repo
 
-If a dedicated key does not exist, ask permission before creating one.
+Do not guess the private repo URI. The private history repo must exist before `claw-keeper init --remote ...` runs. If the user has not created it yet, ask them to create a private GitHub repo first, then provide the SSH URI.
+
+If a dedicated key does not exist, ask permission before creating one. Show only the public key. Never print, paste, or inspect the private key content.
 
 ## Install Tool
 
@@ -57,7 +59,9 @@ cat ~/.ssh/claw_keeper_history_ed25519.pub
 
 Tell the user to add the public key as a write-enabled deploy key on the private history repo.
 
-Use this SSH host alias in `~/.ssh/config`:
+For extra history protection, recommend that the user protect the private history branch, usually `raw-history`, in GitHub settings. At minimum, disable force pushes and branch deletion for that branch so Claw Keeper or OpenClaw can append commits but cannot rewrite or erase existing history.
+
+Use a dedicated SSH host alias in `~/.ssh/config` so the private history repo uses only this deploy key:
 
 ```sshconfig
 Host github-claw-keeper-history
@@ -72,6 +76,25 @@ Then the private repo URI should look like:
 ```text
 git@github-claw-keeper-history:<owner>/openclaw-history.git
 ```
+
+Do not initialize Claw Keeper with a raw `git@github.com:<owner>/<repo>.git` remote if a deploy-key alias is intended. Convert it to the alias form first, then verify SSH access before taking the first snapshot:
+
+```bash
+ssh -T github-claw-keeper-history
+```
+
+If SSH access fails, stop and ask the user to confirm that the public key was added as a write-enabled deploy key.
+
+## Key Custody
+
+Be precise about what the setup protects. A deploy key under the same Unix user as OpenClaw, such as `~/.ssh/claw_keeper_history_ed25519`, is outside the mirrored snapshot paths but is still readable by processes running as that user. Do not claim it is outside OpenClaw's reach.
+
+Key custody levels:
+
+- If the user SSHes into the VM and creates/configures the deploy key manually under the OpenClaw Unix user, the private key avoids chat/tool-output exposure but is still readable by OpenClaw.
+- For actual isolation from OpenClaw, use a separate OS user/service account for Claw Keeper, store the key under that account, and run the watcher service there. This is a future hardening task, not the default setup.
+
+Only a separate OS account or root-owned unreadable path meaningfully moves the private key out of OpenClaw's reach. If the user wants that stronger model, pause and ask them to perform the privileged user/key/service setup out of band.
 
 ## Initialize
 
