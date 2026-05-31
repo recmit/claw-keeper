@@ -16,7 +16,6 @@ from .policy import (
     LEGACY_BROAD_INCLUDE_PATHS,
     NARROW_TEXT_INCLUDE_PATHS,
     POLICY_VERSION,
-    RETIRED_DIRECTORY_EXCLUDE_PATTERNS,
 )
 
 
@@ -79,7 +78,7 @@ class KeeperConfig:
             "exclude_patterns",
         )
         if migrated_default_policy:
-            exclude_patterns = _migrated_exclude_patterns(exclude_patterns)
+            exclude_patterns = DEFAULT_EXCLUDE_PATTERNS
 
         remote = data.get("remote")
         if remote is not None and not isinstance(remote, str):
@@ -153,14 +152,3 @@ def _string_tuple(value: Any, key: str) -> Tuple[str, ...]:
     if not all(isinstance(item, str) and item for item in result):
         raise ConfigError("{0} must be a list of non-empty strings".format(key))
     return result
-
-
-def _migrated_exclude_patterns(existing: Tuple[str, ...]) -> Tuple[str, ...]:
-    merged = []
-    retired = set(RETIRED_DIRECTORY_EXCLUDE_PATTERNS)
-    for pattern in existing + DEFAULT_EXCLUDE_PATTERNS:
-        if pattern in retired:
-            continue
-        if pattern not in merged:
-            merged.append(pattern)
-    return tuple(merged)

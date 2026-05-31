@@ -27,14 +27,6 @@ NARROW_TEXT_INCLUDE_PATHS = (
 
 LEGACY_BROAD_INCLUDE_PATHS = DEFAULT_INCLUDE_PATHS
 
-RETIRED_DIRECTORY_EXCLUDE_PATTERNS = (
-    "agents/",
-    "identity/",
-    "memory/",
-    "flows/",
-    "tasks/",
-)
-
 DEFAULT_PRUNE_PATHS = ()
 
 DEFAULT_MAX_TEXT_FILE_BYTES = 512 * 1024

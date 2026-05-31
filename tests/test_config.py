@@ -10,7 +10,6 @@ from claw_keeper.policy import (
     DEFAULT_INCLUDE_PATHS,
     LEGACY_BROAD_INCLUDE_PATHS,
     NARROW_TEXT_INCLUDE_PATHS,
-    RETIRED_DIRECTORY_EXCLUDE_PATTERNS,
 )
 
 
@@ -81,7 +80,7 @@ def test_load_config_migrates_legacy_broad_default_policy(tmp_path):
                 "repo_path": str(tmp_path / "repo"),
                 "branch": "raw-history",
                 "include_paths": list(LEGACY_BROAD_INCLUDE_PATHS),
-                "exclude_patterns": [".env", "workspace/custom-secret.md"],
+                "exclude_patterns": [".env", "workspace/old-generated-risk-exclude.md"],
                 "remote": None,
             }
         ),
@@ -91,9 +90,8 @@ def test_load_config_migrates_legacy_broad_default_policy(tmp_path):
     config = load_config(path)
 
     assert config.include_paths == DEFAULT_INCLUDE_PATHS
-    assert "workspace/custom-secret.md" in config.exclude_patterns
-    for pattern in DEFAULT_EXCLUDE_PATTERNS:
-        assert pattern in config.exclude_patterns
+    assert config.exclude_patterns == DEFAULT_EXCLUDE_PATTERNS
+    assert "workspace/old-generated-risk-exclude.md" not in config.exclude_patterns
     assert config.policy_version == 3
 
 
@@ -106,7 +104,7 @@ def test_load_config_migrates_narrow_text_default_policy(tmp_path):
                 "repo_path": str(tmp_path / "repo"),
                 "branch": "raw-history",
                 "include_paths": list(NARROW_TEXT_INCLUDE_PATHS),
-                "exclude_patterns": ["agents/", "identity/", "workspace/custom-secret.md"],
+                "exclude_patterns": ["agents/", "identity/", "workspace/old-generated-risk-exclude.md"],
                 "remote": None,
                 "policy_version": 2,
             }
@@ -117,11 +115,8 @@ def test_load_config_migrates_narrow_text_default_policy(tmp_path):
     config = load_config(path)
 
     assert config.include_paths == DEFAULT_INCLUDE_PATHS
-    assert "workspace/custom-secret.md" in config.exclude_patterns
-    for pattern in DEFAULT_EXCLUDE_PATTERNS:
-        assert pattern in config.exclude_patterns
-    for pattern in RETIRED_DIRECTORY_EXCLUDE_PATTERNS:
-        assert pattern not in config.exclude_patterns
+    assert config.exclude_patterns == DEFAULT_EXCLUDE_PATTERNS
+    assert "workspace/old-generated-risk-exclude.md" not in config.exclude_patterns
     assert config.policy_version == 3
 
 
