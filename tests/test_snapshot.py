@@ -125,7 +125,8 @@ def test_snapshot_refuses_dirty_unmanaged_repo_path(tmp_path, monkeypatch, capsy
 
 def test_snapshot_refuses_high_risk_content(tmp_path, monkeypatch, capsys):
     source, repo, config_path = init_fixture(tmp_path, monkeypatch)
-    (source / "workspace" / "SECRET.md").write_text("BEGIN OPENSSH PRIVATE KEY\n", encoding="utf-8")
+    private_key_header = "-----BEGIN " + "OPENSSH PRIVATE KEY-----\n"
+    (source / "workspace" / "SECRET.md").write_text(private_key_header, encoding="utf-8")
 
     result = main(["snapshot", "--reason", "manual", "--config", str(config_path)])
 
@@ -134,6 +135,34 @@ def test_snapshot_refuses_high_risk_content(tmp_path, monkeypatch, capsys):
     assert "HIGH risk findings" in captured.err
     with pytest.raises(Exception):
         run_git(["rev-parse", "--verify", "HEAD"], repo)
+
+
+def test_snapshot_allows_marker_names_without_secret_values(tmp_path, monkeypatch, capsys):
+    source, repo, config_path = init_fixture(tmp_path, monkeypatch)
+    (source / "workspace" / "examples.md").write_text(
+        "Document OPENAI_API_KEY and BEGIN OPENSSH PRIVATE KEY as literal examples only.\n",
+        encoding="utf-8",
+    )
+
+    result = main(["snapshot", "--reason", "manual", "--config", str(config_path)])
+
+    capsys.readouterr()
+    assert result == 0
+    assert (repo / "workspace" / "examples.md").exists()
+
+
+def test_snapshot_refuses_assigned_secret_values(tmp_path, monkeypatch, capsys):
+    source, repo, config_path = init_fixture(tmp_path, monkeypatch)
+    (source / "workspace" / "SECRET.md").write_text(
+        "OPENAI_API_KEY=sk-" + ("a" * 32) + "\n",
+        encoding="utf-8",
+    )
+
+    result = main(["snapshot", "--reason", "manual", "--config", str(config_path)])
+
+    captured = capsys.readouterr()
+    assert result == 1
+    assert "HIGH risk findings" in captured.err
 
 
 def test_snapshot_skips_symlinks(tmp_path, monkeypatch, capsys):

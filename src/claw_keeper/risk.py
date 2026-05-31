@@ -2,20 +2,31 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Sequence, Tuple
+from typing import List, Pattern, Sequence, Tuple
 
 
-HIGH_MARKERS = (
+HIGH_PATTERNS: Tuple[Tuple[str, Pattern[str]], ...] = (
+    ("OPENAI_API_KEY assignment", re.compile(r"OPENAI_API_KEY\s*[:=]\s*['\"]?sk-[A-Za-z0-9_-]{16,}")),
+    (
+        "ANTHROPIC_API_KEY assignment",
+        re.compile(r"ANTHROPIC_API_KEY\s*[:=]\s*['\"]?sk-ant-[A-Za-z0-9_-]{16,}"),
+    ),
+    (
+        "AWS_SECRET_ACCESS_KEY assignment",
+        re.compile(r"AWS_SECRET_ACCESS_KEY\s*[:=]\s*['\"]?[A-Za-z0-9/+=]{32,}"),
+    ),
+    ("private key block", re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----")),
+)
+
+MEDIUM_MARKERS = (
     "OPENAI_API_KEY",
     "ANTHROPIC_API_KEY",
     "AWS_SECRET_ACCESS_KEY",
     "BEGIN PRIVATE KEY",
     "BEGIN OPENSSH PRIVATE KEY",
-)
-
-MEDIUM_MARKERS = (
     "access_token",
     "refresh_token",
     "oauth",
@@ -55,8 +66,8 @@ def scan_file(root: Path, path: Path) -> List[RiskFinding]:
     lowered = text.lower()
 
     findings = []
-    for marker in HIGH_MARKERS:
-        if marker in text:
+    for marker, pattern in HIGH_PATTERNS:
+        if pattern.search(text):
             findings.append(RiskFinding("HIGH", relative, marker))
     for marker in MEDIUM_MARKERS:
         if marker.lower() in lowered:
