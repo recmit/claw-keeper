@@ -10,6 +10,7 @@ from claw_keeper.policy import (
     DEFAULT_INCLUDE_PATHS,
     LEGACY_BROAD_INCLUDE_PATHS,
     NARROW_TEXT_INCLUDE_PATHS,
+    RETIRED_DIRECTORY_EXCLUDE_PATTERNS,
 )
 
 
@@ -36,6 +37,7 @@ def test_make_config_expands_paths_and_applies_default_policy(tmp_path, monkeypa
     assert "openclaw.json" in config.include_paths
     assert "." not in config.include_paths
     assert config.exclude_patterns == DEFAULT_EXCLUDE_PATTERNS
+    assert ".claw-keeper/" in config.exclude_patterns
     assert "agents/" not in config.exclude_patterns
     assert "identity/" not in config.exclude_patterns
     assert "memory/" not in config.exclude_patterns
@@ -43,6 +45,7 @@ def test_make_config_expands_paths_and_applies_default_policy(tmp_path, monkeypa
     assert "tasks/" not in config.exclude_patterns
     assert "secrets/" in config.exclude_patterns
     assert "logs/" in config.exclude_patterns
+    assert "identity/device*.json" in config.exclude_patterns
     assert "*.sqlite-wal" in config.exclude_patterns
     assert "*auth*" in config.exclude_patterns
     assert config.remote is None
@@ -78,7 +81,7 @@ def test_load_config_migrates_legacy_broad_default_policy(tmp_path):
                 "repo_path": str(tmp_path / "repo"),
                 "branch": "raw-history",
                 "include_paths": list(LEGACY_BROAD_INCLUDE_PATHS),
-                "exclude_patterns": [".env"],
+                "exclude_patterns": [".env", "workspace/custom-secret.md"],
                 "remote": None,
             }
         ),
@@ -88,7 +91,9 @@ def test_load_config_migrates_legacy_broad_default_policy(tmp_path):
     config = load_config(path)
 
     assert config.include_paths == DEFAULT_INCLUDE_PATHS
-    assert config.exclude_patterns == DEFAULT_EXCLUDE_PATTERNS
+    assert "workspace/custom-secret.md" in config.exclude_patterns
+    for pattern in DEFAULT_EXCLUDE_PATTERNS:
+        assert pattern in config.exclude_patterns
     assert config.policy_version == 3
 
 
@@ -101,7 +106,7 @@ def test_load_config_migrates_narrow_text_default_policy(tmp_path):
                 "repo_path": str(tmp_path / "repo"),
                 "branch": "raw-history",
                 "include_paths": list(NARROW_TEXT_INCLUDE_PATHS),
-                "exclude_patterns": ["agents/", "identity/"],
+                "exclude_patterns": ["agents/", "identity/", "workspace/custom-secret.md"],
                 "remote": None,
                 "policy_version": 2,
             }
@@ -112,9 +117,11 @@ def test_load_config_migrates_narrow_text_default_policy(tmp_path):
     config = load_config(path)
 
     assert config.include_paths == DEFAULT_INCLUDE_PATHS
-    assert config.exclude_patterns == DEFAULT_EXCLUDE_PATTERNS
-    assert "agents/" not in config.exclude_patterns
-    assert "identity/" not in config.exclude_patterns
+    assert "workspace/custom-secret.md" in config.exclude_patterns
+    for pattern in DEFAULT_EXCLUDE_PATTERNS:
+        assert pattern in config.exclude_patterns
+    for pattern in RETIRED_DIRECTORY_EXCLUDE_PATTERNS:
+        assert pattern not in config.exclude_patterns
     assert config.policy_version == 3
 
 

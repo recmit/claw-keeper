@@ -38,7 +38,8 @@ def run_watch(
         current = scan_source_state(config)
         now = time.monotonic()
         if current != previous:
-            pending_since = now
+            if pending_since is None:
+                pending_since = now
             pending_state = current
 
         if pending_since is not None and now - pending_since >= debounce:

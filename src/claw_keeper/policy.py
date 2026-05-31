@@ -27,6 +27,14 @@ NARROW_TEXT_INCLUDE_PATHS = (
 
 LEGACY_BROAD_INCLUDE_PATHS = DEFAULT_INCLUDE_PATHS
 
+RETIRED_DIRECTORY_EXCLUDE_PATTERNS = (
+    "agents/",
+    "identity/",
+    "memory/",
+    "flows/",
+    "tasks/",
+)
+
 DEFAULT_PRUNE_PATHS = ()
 
 DEFAULT_MAX_TEXT_FILE_BYTES = 512 * 1024
@@ -68,6 +76,7 @@ DEFAULT_TEXT_FILENAMES = (
 )
 
 DEFAULT_EXCLUDE_PATTERNS = (
+    ".claw-keeper/",
     ".git/",
     ".pytest_cache/",
     ".uv-cache/",
@@ -83,6 +92,7 @@ DEFAULT_EXCLUDE_PATTERNS = (
     "devices/",
     "goals_*.sqlite*",
     "identity/device-auth.json",
+    "identity/device*.json",
     "logs/",
     "node_modules/",
     "npm/",

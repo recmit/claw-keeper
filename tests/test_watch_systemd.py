@@ -3,6 +3,7 @@ from pathlib import Path
 from claw_keeper.cli import main
 from claw_keeper.config import load_config
 from claw_keeper.git import run_git
+from claw_keeper import watch as watch_module
 from claw_keeper.watch import run_watch
 
 
@@ -59,6 +60,30 @@ def test_watch_detects_safe_openclaw_context_change(tmp_path, monkeypatch):
 
     assert (repo / "agents" / "main" / "notes.md").read_text(encoding="utf-8") == "agent note\n"
     assert run_git(["rev-parse", "--verify", "HEAD"], repo)
+
+
+def test_watch_debounce_does_not_reset_while_changes_continue(tmp_path, monkeypatch):
+    _source, _repo, config_path = init_fixture(tmp_path, monkeypatch)
+    config = load_config(config_path)
+    snapshots = []
+    states = iter(
+        [
+            {"workspace/USER.md": "v0"},
+            {"workspace/USER.md": "v1"},
+            {"workspace/USER.md": "v2"},
+            {"workspace/USER.md": "v3"},
+        ]
+    )
+    times = iter([0, 5, 11])
+
+    monkeypatch.setattr(watch_module, "scan_source_state", lambda _config: next(states))
+    monkeypatch.setattr(watch_module.time, "monotonic", lambda: next(times))
+    monkeypatch.setattr(watch_module.time, "sleep", lambda _interval: None)
+    monkeypatch.setattr(watch_module, "run_snapshot", lambda *_args, **_kwargs: snapshots.append("snapshot"))
+
+    run_watch(config, debounce=10, interval=0, max_iterations=3)
+
+    assert snapshots == ["snapshot"]
 
 
 def test_install_systemd_dry_run_emits_service(tmp_path, monkeypatch, capsys):
