@@ -18,12 +18,16 @@ class CommitMessage:
 
 
 class CommitMessageProvider:
-    def generate(self, changed_files: Iterable[str], reason: Optional[str] = None) -> CommitMessage:
+    def generate(
+        self, changed_files: Iterable[str], reason: Optional[str] = None
+    ) -> CommitMessage:
         raise NotImplementedError
 
 
 class FallbackCommitMessageProvider(CommitMessageProvider):
-    def generate(self, changed_files: Iterable[str], reason: Optional[str] = None) -> CommitMessage:
+    def generate(
+        self, changed_files: Iterable[str], reason: Optional[str] = None
+    ) -> CommitMessage:
         files = list(changed_files)
         subject = "chore(agent-state): snapshot OpenClaw state"
         body = []
@@ -37,5 +41,9 @@ class FallbackCommitMessageProvider(CommitMessageProvider):
 
 
 class LLMCommitMessageProvider(CommitMessageProvider):
-    def generate(self, changed_files: Iterable[str], reason: Optional[str] = None) -> CommitMessage:
-        raise NotImplementedError("LLM commit-message generation is not implemented in this slice")
+    def generate(
+        self, changed_files: Iterable[str], reason: Optional[str] = None
+    ) -> CommitMessage:
+        raise NotImplementedError(
+            "LLM commit-message generation is not implemented in this slice"
+        )

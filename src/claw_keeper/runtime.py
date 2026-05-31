@@ -14,7 +14,9 @@ def runtime_root() -> Path:
 
 
 def repo_hash(repo_path: str) -> str:
-    return hashlib.sha256(str(Path(repo_path).expanduser().resolve()).encode("utf-8")).hexdigest()[:16]
+    return hashlib.sha256(
+        str(Path(repo_path).expanduser().resolve()).encode("utf-8")
+    ).hexdigest()[:16]
 
 
 @dataclass(frozen=True)

@@ -77,7 +77,10 @@ def scan_source_state(config: KeeperConfig) -> Dict[str, str]:
             if path.is_symlink():
                 continue
             rel = path_to_posix(path.relative_to(source_root))
-            if path.is_file() and classify_path(path, rel, config.exclude_patterns).include:
+            if (
+                path.is_file()
+                and classify_path(path, rel, config.exclude_patterns).include
+            ):
                 state[rel] = _file_signature(path)
     return state
 
@@ -104,4 +107,6 @@ def _load_watch_state(state: RuntimeState) -> Optional[Dict[str, str]]:
 
 def _write_watch_state(state: RuntimeState, data: Dict[str, str]) -> None:
     state.ensure()
-    state.watch_state_path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    state.watch_state_path.write_text(
+        json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )

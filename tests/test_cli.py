@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from claw_keeper.cli import main
 from claw_keeper.config import load_config
 from claw_keeper.git import run_git
@@ -32,7 +30,9 @@ def test_init_creates_config_and_history_repo(tmp_path, capsys):
     assert result == 0
     assert "Initialized Claw Keeper" in captured.out
     assert (repo / ".git").exists()
-    assert run_git(["symbolic-ref", "--quiet", "--short", "HEAD"], repo) == "raw-history"
+    assert (
+        run_git(["symbolic-ref", "--quiet", "--short", "HEAD"], repo) == "raw-history"
+    )
     assert config.source_path == str(source)
     assert config.repo_path == str(repo)
     assert config.branch == "raw-history"
@@ -98,7 +98,20 @@ def test_status_works_before_any_commits(tmp_path, capsys):
     repo = tmp_path / "history"
     config_path = tmp_path / "config.json"
     source.mkdir()
-    assert main(["init", "--source", str(source), "--repo", str(repo), "--config", str(config_path)]) == 0
+    assert (
+        main(
+            [
+                "init",
+                "--source",
+                str(source),
+                "--repo",
+                str(repo),
+                "--config",
+                str(config_path),
+            ]
+        )
+        == 0
+    )
     capsys.readouterr()
 
     result = main(["status", "--config", str(config_path)])
@@ -112,7 +125,10 @@ def test_status_works_before_any_commits(tmp_path, capsys):
     assert "Included paths: workspace/" in captured.out
     assert "Current branch: raw-history" in captured.out
     assert "Latest commit: none yet" in captured.out
-    assert "Implemented commands: init, status, snapshot, watch, install-systemd" in captured.out
+    assert (
+        "Implemented commands: init, status, snapshot, watch, install-systemd"
+        in captured.out
+    )
     assert "Not implemented yet: restore-plan, restore" in captured.out
 
 
@@ -133,7 +149,18 @@ def test_init_refuses_to_switch_non_empty_repo_branch(tmp_path, capsys):
     run_git(["init"], repo)
     (repo / "README.md").write_text("existing\n", encoding="utf-8")
     run_git(["add", "README.md"], repo)
-    run_git(["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "initial"], repo)
+    run_git(
+        [
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "initial",
+        ],
+        repo,
+    )
 
     result = main(
         [

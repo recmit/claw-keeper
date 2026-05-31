@@ -7,7 +7,13 @@ import sys
 from pathlib import Path
 from typing import Optional, Sequence
 
-from .config import ConfigError, default_config_path, load_config, make_config, write_config
+from .config import (
+    ConfigError,
+    default_config_path,
+    load_config,
+    make_config,
+    write_config,
+)
 from .git import (
     GitError,
     current_branch,
@@ -31,11 +37,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="claw-keeper")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    init_parser = subparsers.add_parser("init", help="initialize Claw Keeper config and history repo")
-    init_parser.add_argument("--source", required=True, help="OpenClaw state root, usually ~/.openclaw")
+    init_parser = subparsers.add_parser(
+        "init", help="initialize Claw Keeper config and history repo"
+    )
+    init_parser.add_argument(
+        "--source", required=True, help="OpenClaw state root, usually ~/.openclaw"
+    )
     init_parser.add_argument("--repo", required=True, help="Git history repo path")
-    init_parser.add_argument("--branch", default=DEFAULT_BRANCH, help="history branch name")
-    init_parser.add_argument("--remote", help="private history repo remote URL to configure as origin")
+    init_parser.add_argument(
+        "--branch", default=DEFAULT_BRANCH, help="history branch name"
+    )
+    init_parser.add_argument(
+        "--remote", help="private history repo remote URL to configure as origin"
+    )
     init_parser.add_argument("--config", help="config file path")
     init_parser.set_defaults(handler=handle_init)
 
@@ -43,27 +57,59 @@ def build_parser() -> argparse.ArgumentParser:
     status_parser.add_argument("--config", help="config file path")
     status_parser.set_defaults(handler=handle_status)
 
-    snapshot_parser = subparsers.add_parser("snapshot", help="snapshot safe OpenClaw state")
-    snapshot_parser.add_argument("--reason", required=True, help="snapshot reason for the commit message")
-    snapshot_parser.add_argument("--push", action="store_true", help="push after committing")
-    snapshot_parser.add_argument("--dry-run", action="store_true", help="prepare snapshot without changing the repo")
+    snapshot_parser = subparsers.add_parser(
+        "snapshot", help="snapshot safe OpenClaw state"
+    )
+    snapshot_parser.add_argument(
+        "--reason", required=True, help="snapshot reason for the commit message"
+    )
+    snapshot_parser.add_argument(
+        "--push", action="store_true", help="push after committing"
+    )
+    snapshot_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="prepare snapshot without changing the repo",
+    )
     snapshot_parser.add_argument("--config", help="config file path")
     snapshot_parser.set_defaults(handler=handle_snapshot)
 
-    watch_parser = subparsers.add_parser("watch", help="watch source state and snapshot after changes")
-    watch_parser.add_argument("--debounce", type=float, default=60, help="quiet period before snapshotting")
-    watch_parser.add_argument("--interval", type=float, default=5, help="polling interval")
-    watch_parser.add_argument("--push", action="store_true", help="push watcher snapshots")
+    watch_parser = subparsers.add_parser(
+        "watch", help="watch source state and snapshot after changes"
+    )
+    watch_parser.add_argument(
+        "--debounce", type=float, default=60, help="quiet period before snapshotting"
+    )
+    watch_parser.add_argument(
+        "--interval", type=float, default=5, help="polling interval"
+    )
+    watch_parser.add_argument(
+        "--push", action="store_true", help="push watcher snapshots"
+    )
     watch_parser.add_argument("--config", help="config file path")
     watch_parser.set_defaults(handler=handle_watch)
 
-    systemd_parser = subparsers.add_parser("install-systemd", help="install a user systemd watcher service")
+    systemd_parser = subparsers.add_parser(
+        "install-systemd", help="install a user systemd watcher service"
+    )
     apply_group = systemd_parser.add_mutually_exclusive_group(required=True)
-    apply_group.add_argument("--dry-run", action="store_true", help="print the service file without writing it")
-    apply_group.add_argument("--apply", action="store_true", help="write the user service file")
-    systemd_parser.add_argument("--debounce", type=int, default=60, help="watch debounce seconds")
-    systemd_parser.add_argument("--interval", type=int, default=5, help="watch polling interval seconds")
-    systemd_parser.add_argument("--push", action="store_true", help="push watcher snapshots")
+    apply_group.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="print the service file without writing it",
+    )
+    apply_group.add_argument(
+        "--apply", action="store_true", help="write the user service file"
+    )
+    systemd_parser.add_argument(
+        "--debounce", type=int, default=60, help="watch debounce seconds"
+    )
+    systemd_parser.add_argument(
+        "--interval", type=int, default=5, help="watch polling interval seconds"
+    )
+    systemd_parser.add_argument(
+        "--push", action="store_true", help="push watcher snapshots"
+    )
     systemd_parser.add_argument("--config", help="config file path")
     systemd_parser.set_defaults(handler=handle_install_systemd)
 
@@ -133,7 +179,11 @@ def handle_status(args: argparse.Namespace) -> int:
         origin = remote_url(repo_path) or "not configured"
         print("  Current branch: {0}".format(branch))
         print("  Git origin: {0}".format(origin))
-        print("  Working tree: {0}".format("clean" if not changes else "dirty ({0} changes)".format(len(changes))))
+        print(
+            "  Working tree: {0}".format(
+                "clean" if not changes else "dirty ({0} changes)".format(len(changes))
+            )
+        )
         print("  Latest commit: {0}".format(latest or "none yet"))
     else:
         print("  Current branch: unavailable")
@@ -156,7 +206,9 @@ def handle_status(args: argparse.Namespace) -> int:
 
 def handle_snapshot(args: argparse.Namespace) -> int:
     config = load_config(_config_path(args.config))
-    result = run_snapshot(config, reason=args.reason, push=args.push, dry_run=args.dry_run)
+    result = run_snapshot(
+        config, reason=args.reason, push=args.push, dry_run=args.dry_run
+    )
     print(result.message)
     if result.pending_recorded:
         return 0
@@ -178,7 +230,9 @@ def handle_watch(args: argparse.Namespace) -> int:
 
 def handle_install_systemd(args: argparse.Namespace) -> int:
     config_path = _config_path(args.config)
-    service = render_service(config_path, debounce=args.debounce, interval=args.interval, push=args.push)
+    service = render_service(
+        config_path, debounce=args.debounce, interval=args.interval, push=args.push
+    )
     if args.dry_run:
         print(service, end="")
         print("")
@@ -187,7 +241,9 @@ def handle_install_systemd(args: argparse.Namespace) -> int:
         print("Then run: systemctl --user enable --now claw-keeper-watch")
         return 0
 
-    path = install_service(config_path, debounce=args.debounce, interval=args.interval, push=args.push)
+    path = install_service(
+        config_path, debounce=args.debounce, interval=args.interval, push=args.push
+    )
     print("Wrote {0}".format(path))
     print("Run: systemctl --user daemon-reload")
     print("Run: systemctl --user enable --now claw-keeper-watch")

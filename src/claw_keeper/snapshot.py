@@ -22,10 +22,21 @@ from .git import (
     staged_name_status,
     working_tree_porcelain,
 )
-from .matching import is_managed_repo_path, normalize_relative_path, path_to_posix, status_paths
+from .matching import (
+    is_managed_repo_path,
+    normalize_relative_path,
+    path_to_posix,
+    status_paths,
+)
 from .mirror import classify_path, skipped_entry
 from .policy import DEFAULT_PRUNE_PATHS
-from .risk import RiskFinding, has_high_risk, render_report, scan_tree, summarize_findings
+from .risk import (
+    RiskFinding,
+    has_high_risk,
+    render_report,
+    scan_tree,
+    summarize_findings,
+)
 from .runtime import RuntimeState, SnapshotLock
 
 
@@ -78,7 +89,9 @@ def run_snapshot(
     try:
         state.clear_pending()
         attempts = []
-        attempt = _run_snapshot_once(config, reason, push=push, dry_run=dry_run, state=state)
+        attempt = _run_snapshot_once(
+            config, reason, push=push, dry_run=dry_run, state=state
+        )
         attempts.append(attempt)
         if after_attempt:
             after_attempt(0, attempt, state)
@@ -86,7 +99,9 @@ def run_snapshot(
         followups = 0
         while followups < max_followups and state.has_pending():
             state.clear_pending()
-            followup = _run_snapshot_once(config, reason, push=push, dry_run=dry_run, state=state)
+            followup = _run_snapshot_once(
+                config, reason, push=push, dry_run=dry_run, state=state
+            )
             attempts.append(followup)
             followups += 1
             if after_attempt:
@@ -97,7 +112,9 @@ def run_snapshot(
         lock.release()
 
 
-def _combine_attempts(attempts: Sequence[SnapshotAttempt], followup_ran: bool) -> SnapshotResult:
+def _combine_attempts(
+    attempts: Sequence[SnapshotAttempt], followup_ran: bool
+) -> SnapshotResult:
     changed = []
     for attempt in attempts:
         changed.extend(attempt.changed_files)
@@ -121,7 +138,9 @@ def _run_snapshot_once(
 ) -> SnapshotAttempt:
     repo_path = Path(config.repo_path)
     if not is_git_repo(repo_path):
-        raise SnapshotError("history repo is not a Git repository: {0}".format(repo_path))
+        raise SnapshotError(
+            "history repo is not a Git repository: {0}".format(repo_path)
+        )
     _ensure_no_unmanaged_dirty_paths(config)
 
     staging_root = _build_staging_tree(config, state)
@@ -130,7 +149,11 @@ def _run_snapshot_once(
         if has_high_risk(findings):
             report_path = state.root / "last-risk-scan.md"
             report_path.write_text(render_report(findings), encoding="utf-8")
-            raise SnapshotError("HIGH risk findings detected; refusing to commit. Report: {0}".format(report_path))
+            raise SnapshotError(
+                "HIGH risk findings detected; refusing to commit. Report: {0}".format(
+                    report_path
+                )
+            )
 
         if dry_run:
             files = _list_tree_files(staging_root)
@@ -138,7 +161,9 @@ def _run_snapshot_once(
                 committed=False,
                 changed_files=files,
                 dry_run=True,
-                message="dry run prepared {0} files; {1}".format(len(files), summarize_findings(findings)),
+                message="dry run prepared {0} files; {1}".format(
+                    len(files), summarize_findings(findings)
+                ),
             )
 
         _apply_staging_tree(config, staging_root)
@@ -153,7 +178,9 @@ def _run_snapshot_once(
     add_all(repo_path)
     changed = staged_name_status(repo_path)
     changed_files = _changed_files_from_name_status(changed)
-    message_file = _write_commit_message(repo_path, reason, changed_files, findings, report_path)
+    message_file = _write_commit_message(
+        repo_path, reason, changed_files, findings, report_path
+    )
     commit_with_message(repo_path, message_file)
 
     push_attempted = False
@@ -179,11 +206,15 @@ def _ensure_no_unmanaged_dirty_paths(config: KeeperConfig) -> None:
     unmanaged = []
     for line in dirty:
         for path in status_paths(line):
-            if path and not is_managed_repo_path(path, _managed_paths_for_cleanup(config)):
+            if path and not is_managed_repo_path(
+                path, _managed_paths_for_cleanup(config)
+            ):
                 unmanaged.append(path)
     if unmanaged:
         raise SnapshotError(
-            "history repo has dirty files outside managed paths: {0}".format(", ".join(sorted(unmanaged)))
+            "history repo has dirty files outside managed paths: {0}".format(
+                ", ".join(sorted(unmanaged))
+            )
         )
 
 
@@ -203,7 +234,9 @@ def _build_staging_tree(config: KeeperConfig, state: RuntimeState) -> Path:
             missing_includes.append(relative)
             continue
         destination = staging_root if relative == "." else staging_root / relative
-        copied, skipped_paths = _copy_source_path(source_root, source, destination, staging_root, config.exclude_patterns)
+        copied, skipped_paths = _copy_source_path(
+            source_root, source, destination, staging_root, config.exclude_patterns
+        )
         entries.extend(copied)
         skipped.extend(skipped_paths)
 
@@ -227,7 +260,9 @@ def _copy_source_path(
     if source.is_file():
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(str(source), str(destination), follow_symlinks=False)
-        return [_manifest_entry_for_file(destination, destination.relative_to(staging_root))], skipped
+        return [
+            _manifest_entry_for_file(destination, destination.relative_to(staging_root))
+        ], skipped
 
     for root, dirs, files in os.walk(source, topdown=True, followlinks=False):
         root_path = Path(root)
@@ -239,7 +274,9 @@ def _copy_source_path(
             if child_decision.include:
                 kept_dirs.append(dirname)
             else:
-                skipped.append(skipped_entry(child, child_relative, child_decision.reason))
+                skipped.append(
+                    skipped_entry(child, child_relative, child_decision.reason)
+                )
         dirs[:] = kept_dirs
 
         for filename in sorted(files):
@@ -247,12 +284,18 @@ def _copy_source_path(
             child_relative = path_to_posix(child.relative_to(source_root))
             child_decision = classify_path(child, child_relative, excludes)
             if not child_decision.include:
-                skipped.append(skipped_entry(child, child_relative, child_decision.reason))
+                skipped.append(
+                    skipped_entry(child, child_relative, child_decision.reason)
+                )
                 continue
             child_destination = destination / child.relative_to(source)
             child_destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(str(child), str(child_destination), follow_symlinks=False)
-            copied.append(_manifest_entry_for_file(child_destination, child_destination.relative_to(staging_root)))
+            copied.append(
+                _manifest_entry_for_file(
+                    child_destination, child_destination.relative_to(staging_root)
+                )
+            )
     return copied, skipped
 
 
@@ -286,7 +329,9 @@ def _write_manifest(
     }
     manifest_path = staging_root / "manifests" / "latest.json"
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
 
 
 def _apply_staging_tree(config: KeeperConfig, staging_root: Path) -> None:
@@ -374,7 +419,11 @@ def _changed_files_from_name_status(lines: Sequence[str]) -> List[str]:
 
 
 def _list_tree_files(root: Path) -> List[str]:
-    return sorted(path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file() and not path.is_symlink())
+    return sorted(
+        path.relative_to(root).as_posix()
+        for path in root.rglob("*")
+        if path.is_file() and not path.is_symlink()
+    )
 
 
 def _managed_paths_for_cleanup(config: KeeperConfig) -> tuple[str, ...]:

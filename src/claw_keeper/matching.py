@@ -25,7 +25,9 @@ def path_to_posix(path: Path) -> str:
     return path.as_posix().lstrip("/")
 
 
-def is_excluded(relative_path: str, patterns: Sequence[str], is_dir: bool = False) -> bool:
+def is_excluded(
+    relative_path: str, patterns: Sequence[str], is_dir: bool = False
+) -> bool:
     path = normalize_relative_path(relative_path)
     basename = path.rsplit("/", 1)[-1]
     dir_path = path + "/" if is_dir and not path.endswith("/") else path
@@ -39,7 +41,9 @@ def is_excluded(relative_path: str, patterns: Sequence[str], is_dir: bool = Fals
             if directory in path.split("/"):
                 return True
             continue
-        if fnmatch.fnmatch(path, clean_pattern) or fnmatch.fnmatch(basename, clean_pattern):
+        if fnmatch.fnmatch(path, clean_pattern) or fnmatch.fnmatch(
+            basename, clean_pattern
+        ):
             return True
         if is_dir and fnmatch.fnmatch(dir_path, clean_pattern):
             return True

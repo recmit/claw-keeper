@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from claw_keeper.cli import main
 from claw_keeper.config import load_config
 from claw_keeper.git import run_git
@@ -15,7 +13,20 @@ def init_fixture(tmp_path, monkeypatch):
     config_path = tmp_path / "config.json"
     (source / "workspace").mkdir(parents=True)
     (source / "workspace" / "AGENTS.md").write_text("hello\n", encoding="utf-8")
-    assert main(["init", "--source", str(source), "--repo", str(repo), "--config", str(config_path)]) == 0
+    assert (
+        main(
+            [
+                "init",
+                "--source",
+                str(source),
+                "--repo",
+                str(repo),
+                "--config",
+                str(config_path),
+            ]
+        )
+        == 0
+    )
     return source, repo, config_path
 
 
@@ -37,7 +48,9 @@ def test_watch_ignores_excluded_runtime_changes(tmp_path, monkeypatch):
 
     run_watch(config, debounce=0, interval=0, max_iterations=1)
     (source / "agents" / "main" / "agent" / "codex-home").mkdir(parents=True)
-    (source / "agents" / "main" / "agent" / "codex-home" / "logs_2.sqlite-wal").write_bytes(b"db")
+    (
+        source / "agents" / "main" / "agent" / "codex-home" / "logs_2.sqlite-wal"
+    ).write_bytes(b"db")
     run_watch(config, debounce=0, interval=0, max_iterations=1)
 
     assert not (repo / "agents").exists()
@@ -55,10 +68,14 @@ def test_watch_detects_safe_openclaw_context_change(tmp_path, monkeypatch):
 
     run_watch(config, debounce=0, interval=0, max_iterations=1)
     (source / "agents" / "main").mkdir(parents=True)
-    (source / "agents" / "main" / "notes.md").write_text("agent note\n", encoding="utf-8")
+    (source / "agents" / "main" / "notes.md").write_text(
+        "agent note\n", encoding="utf-8"
+    )
     run_watch(config, debounce=0, interval=0, max_iterations=1)
 
-    assert (repo / "agents" / "main" / "notes.md").read_text(encoding="utf-8") == "agent note\n"
+    assert (repo / "agents" / "main" / "notes.md").read_text(
+        encoding="utf-8"
+    ) == "agent note\n"
     assert run_git(["rev-parse", "--verify", "HEAD"], repo)
 
 
@@ -79,7 +96,11 @@ def test_watch_debounce_does_not_reset_while_changes_continue(tmp_path, monkeypa
     monkeypatch.setattr(watch_module, "scan_source_state", lambda _config: next(states))
     monkeypatch.setattr(watch_module.time, "monotonic", lambda: next(times))
     monkeypatch.setattr(watch_module.time, "sleep", lambda _interval: None)
-    monkeypatch.setattr(watch_module, "run_snapshot", lambda *_args, **_kwargs: snapshots.append("snapshot"))
+    monkeypatch.setattr(
+        watch_module,
+        "run_snapshot",
+        lambda *_args, **_kwargs: snapshots.append("snapshot"),
+    )
 
     run_watch(config, debounce=10, interval=0, max_iterations=3)
 
