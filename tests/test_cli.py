@@ -119,6 +119,7 @@ def test_status_works_before_any_commits(tmp_path, capsys):
     captured = capsys.readouterr()
     assert result == 0
     assert "Claw Keeper status" in captured.out
+    assert "Version: 0.1.1" in captured.out
     assert "Git repo: yes" in captured.out
     assert "Configured remote: not configured" in captured.out
     assert "Git origin: not configured" in captured.out

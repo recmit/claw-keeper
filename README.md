@@ -117,7 +117,7 @@ skills/
 openclaw.json
 ```
 
-Within those paths, Claw Keeper mirrors text files under a conservative size limit and records skipped files in `manifests/latest.json`. The default exclude policy avoids risky or noisy OpenClaw runtime state inside those trees, such as:
+Within those paths, Claw Keeper mirrors text files under a conservative size limit and records skipped files in `manifests/latest.json`. Files with HIGH-risk credential findings are skipped individually with `reason: high-risk-finding`; the rest of the snapshot still commits. The default exclude policy avoids risky or noisy OpenClaw runtime state inside those trees, such as:
 
 ```text
 secrets/

@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 from claw_keeper.cli import main
 from claw_keeper.config import load_config
 from claw_keeper.git import run_git
@@ -96,11 +98,12 @@ def test_watch_debounce_does_not_reset_while_changes_continue(tmp_path, monkeypa
     monkeypatch.setattr(watch_module, "scan_source_state", lambda _config: next(states))
     monkeypatch.setattr(watch_module.time, "monotonic", lambda: next(times))
     monkeypatch.setattr(watch_module.time, "sleep", lambda _interval: None)
-    monkeypatch.setattr(
-        watch_module,
-        "run_snapshot",
-        lambda *_args, **_kwargs: snapshots.append("snapshot"),
-    )
+
+    def fake_snapshot(*_args, **_kwargs):
+        snapshots.append("snapshot")
+        return SimpleNamespace(message="snapshot")
+
+    monkeypatch.setattr(watch_module, "run_snapshot", fake_snapshot)
 
     run_watch(config, debounce=10, interval=0, max_iterations=3)
 

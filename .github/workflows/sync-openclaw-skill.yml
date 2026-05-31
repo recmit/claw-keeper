@@ -44,9 +44,9 @@ jobs:
             git switch --force-create openclaw-skill origin/openclaw-skill
           else
             git switch --orphan openclaw-skill
-            git rm -rf . || true
           fi
 
+          git rm -rf . || true
           cp /tmp/SKILL.md SKILL.md
           git add SKILL.md
 
