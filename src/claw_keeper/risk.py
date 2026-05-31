@@ -79,17 +79,29 @@ def has_high_risk(findings: Sequence[RiskFinding]) -> bool:
     return any(finding.level == "HIGH" for finding in findings)
 
 
-def summarize_findings(findings: Sequence[RiskFinding]) -> str:
+def high_risk_paths(findings: Sequence[RiskFinding]) -> List[str]:
+    return sorted({finding.path for finding in findings if finding.level == "HIGH"})
+
+
+def summarize_findings(findings: Sequence[RiskFinding], skipped_high_risk_paths: Sequence[str] = ()) -> str:
     if not findings:
         return "No credential-like markers found."
     counts = {}
     for finding in findings:
         counts[finding.level] = counts.get(finding.level, 0) + 1
-    return ", ".join("{0}: {1}".format(level, counts[level]) for level in sorted(counts))
+    summary = ", ".join("{0}: {1}".format(level, counts[level]) for level in sorted(counts))
+    if skipped_high_risk_paths:
+        summary = "{0}; skipped high-risk files: {1}".format(summary, len(skipped_high_risk_paths))
+    return summary
 
 
-def render_report(findings: Sequence[RiskFinding]) -> str:
-    lines = ["# Claw Keeper Risk Scan", "", summarize_findings(findings), ""]
+def render_report(findings: Sequence[RiskFinding], skipped_high_risk_paths: Sequence[str] = ()) -> str:
+    lines = ["# Claw Keeper Risk Scan", "", summarize_findings(findings, skipped_high_risk_paths), ""]
+    if skipped_high_risk_paths:
+        lines.append("Skipped high-risk files:")
+        for path in skipped_high_risk_paths:
+            lines.append("- {0}".format(path))
+        lines.append("")
     if findings:
         lines.append("Findings:")
         for finding in findings:

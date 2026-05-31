@@ -22,8 +22,23 @@ This is enough for the main monitoring question: "What did the agent's editable 
 - OpenClaw/Codex runtime areas inside the mirrored trees, such as `codex-home/`, `cache/`, `plugins/cache/`, `shell_snapshots/`, `tmp/`, logs, sessions, devices, completions, and generated task/flow database state.
 - Large files and files that do not look like UTF-8 text.
 - Binary assets, even if they are part of a plugin or skill, unless a future policy explicitly opts them in.
+- Individual text files with HIGH-risk credential findings. These are skipped file-by-file instead of blocking the whole snapshot.
 
 Some of these files may matter for exact runtime continuity. They are excluded because committing them to Git creates higher risk than value for the monitoring use case.
+
+## High-Risk File Skips
+
+The risk scanner is designed to keep monitoring alive. If one copied text file contains a HIGH-risk credential-like finding, Claw Keeper skips that file, records it in `manifests/latest.json` with `reason: high-risk-finding`, writes the finding to the risk report, and commits the rest of the snapshot.
+
+This means:
+
+- A suspicious file does not stop unrelated files such as `workspace/USER.md` from being monitored.
+- If the suspicious content is later removed, the file is eligible to be mirrored again on the next snapshot.
+- The manifest and risk report show that a file was omitted, but they do not store the skipped file content.
+
+This is a monitoring trade-off. It reduces accidental secret commits while avoiding silent all-or-nothing snapshot failures.
+
+There is a future adversarial concern: if an agent can modify a watched file and knows HIGH-risk files are skipped, it could add credential-shaped text to a file to keep that file out of Git history. Future versions should consider stronger visibility for this case, such as explicit skipped-file alerts, metadata-only change tracking for skipped files, or a configurable risk mode.
 
 ## Open Questions
 
@@ -31,6 +46,7 @@ Some of these files may matter for exact runtime continuity. They are excluded b
 - Which plugin or skill assets are required for faithful restore versus merely useful for UI polish?
 - Whether a future "backup profile" should exist separately from the current "monitoring profile".
 - Whether selected database summaries, such as table names, row counts, and hashes, would provide useful audit value without committing raw database contents.
+- How to make high-risk file skips hard to abuse as a way to hide changes from monitoring.
 
 Until these are better understood, Claw Keeper should avoid claiming it can restore a full OpenClaw installation.
 

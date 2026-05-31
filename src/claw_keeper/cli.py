@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 from typing import Optional, Sequence
 
+from . import __version__
 from .config import ConfigError, default_config_path, load_config, make_config, write_config
 from .git import (
     GitError,
@@ -29,6 +30,7 @@ from .watch import run_watch
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="claw-keeper")
+    parser.add_argument("--version", action="version", version="%(prog)s {0}".format(__version__))
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     init_parser = subparsers.add_parser("init", help="initialize Claw Keeper config and history repo")
@@ -112,6 +114,7 @@ def handle_status(args: argparse.Namespace) -> int:
     runtime_state = RuntimeState.for_repo(config.repo_path)
 
     print("Claw Keeper status")
+    print("Version: {0}".format(__version__))
     print("Config: {0}".format(config_path))
     print("")
     print("Source:")

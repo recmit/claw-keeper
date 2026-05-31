@@ -21,6 +21,12 @@
   - Consider safe metadata-only summaries for excluded databases.
   - Decide whether a future backup profile should opt into selected non-text assets.
 
+- [ ] Harden high-risk skipped-file monitoring.
+  - Alert clearly when a watched file is skipped because of HIGH-risk content.
+  - Consider metadata-only change tracking for high-risk skipped files.
+  - Consider configurable risk modes once the monitoring defaults are stable.
+  - Account for the adversarial case where an agent could add credential-shaped text to hide a file from content mirroring.
+
 - [ ] Add restore planning and restore support.
   - Default to dry-run restore plans.
   - Restore only tracked safe files from a selected commit.

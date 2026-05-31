@@ -1,4 +1,3 @@
-import pytest
 import json
 
 from claw_keeper.cli import main
@@ -123,7 +122,7 @@ def test_snapshot_refuses_dirty_unmanaged_repo_path(tmp_path, monkeypatch, capsy
     assert "dirty files outside managed paths" in captured.err
 
 
-def test_snapshot_refuses_high_risk_content(tmp_path, monkeypatch, capsys):
+def test_snapshot_skips_high_risk_files_without_blocking_snapshot(tmp_path, monkeypatch, capsys):
     source, repo, config_path = init_fixture(tmp_path, monkeypatch)
     private_key_header = "-----BEGIN " + "OPENSSH PRIVATE KEY-----\n"
     (source / "workspace" / "SECRET.md").write_text(private_key_header, encoding="utf-8")
@@ -131,10 +130,19 @@ def test_snapshot_refuses_high_risk_content(tmp_path, monkeypatch, capsys):
     result = main(["snapshot", "--reason", "manual", "--config", str(config_path)])
 
     captured = capsys.readouterr()
-    assert result == 1
-    assert "HIGH risk findings" in captured.err
-    with pytest.raises(Exception):
-        run_git(["rev-parse", "--verify", "HEAD"], repo)
+    assert result == 0
+    assert "committed" in captured.out
+    assert (repo / "workspace" / "AGENTS.md").exists()
+    assert not (repo / "workspace" / "SECRET.md").exists()
+
+    manifest = json.loads((repo / "manifests" / "latest.json").read_text(encoding="utf-8"))
+    skipped = {item["path"]: item for item in manifest["skipped"]}
+    assert skipped["workspace/SECRET.md"]["reason"] == "high-risk-finding"
+    assert skipped["workspace/SECRET.md"]["risk_level"] == "HIGH"
+
+    report = next((repo / "reports").glob("*-risk-scan.md")).read_text(encoding="utf-8")
+    assert "Skipped high-risk files:" in report
+    assert "workspace/SECRET.md" in report
 
 
 def test_snapshot_allows_marker_names_without_secret_values(tmp_path, monkeypatch, capsys):
@@ -151,7 +159,7 @@ def test_snapshot_allows_marker_names_without_secret_values(tmp_path, monkeypatc
     assert (repo / "workspace" / "examples.md").exists()
 
 
-def test_snapshot_refuses_assigned_secret_values(tmp_path, monkeypatch, capsys):
+def test_snapshot_skips_assigned_secret_values(tmp_path, monkeypatch, capsys):
     source, repo, config_path = init_fixture(tmp_path, monkeypatch)
     (source / "workspace" / "SECRET.md").write_text(
         "OPENAI_API_KEY=sk-" + ("a" * 32) + "\n",
@@ -160,9 +168,34 @@ def test_snapshot_refuses_assigned_secret_values(tmp_path, monkeypatch, capsys):
 
     result = main(["snapshot", "--reason", "manual", "--config", str(config_path)])
 
-    captured = capsys.readouterr()
-    assert result == 1
-    assert "HIGH risk findings" in captured.err
+    capsys.readouterr()
+    assert result == 0
+    assert not (repo / "workspace" / "SECRET.md").exists()
+
+    manifest = json.loads((repo / "manifests" / "latest.json").read_text(encoding="utf-8"))
+    skipped = {item["path"]: item for item in manifest["skipped"]}
+    assert skipped["workspace/SECRET.md"]["reason"] == "high-risk-finding"
+    assert skipped["workspace/SECRET.md"]["risk_markers"] == ["OPENAI_API_KEY assignment"]
+
+
+def test_snapshot_includes_file_again_after_high_risk_content_is_removed(tmp_path, monkeypatch, capsys):
+    source, repo, config_path = init_fixture(tmp_path, monkeypatch)
+    secret_file = source / "workspace" / "SECRET.md"
+    secret_file.write_text("OPENAI_API_KEY=sk-" + ("a" * 32) + "\n", encoding="utf-8")
+    assert main(["snapshot", "--reason", "manual", "--config", str(config_path)]) == 0
+    assert not (repo / "workspace" / "SECRET.md").exists()
+    capsys.readouterr()
+
+    secret_file.write_text("safe note now\n", encoding="utf-8")
+    result = main(["snapshot", "--reason", "manual", "--config", str(config_path)])
+
+    capsys.readouterr()
+    assert result == 0
+    assert (repo / "workspace" / "SECRET.md").read_text(encoding="utf-8") == "safe note now\n"
+
+    manifest = json.loads((repo / "manifests" / "latest.json").read_text(encoding="utf-8"))
+    skipped_paths = {item["path"] for item in manifest["skipped"]}
+    assert "workspace/SECRET.md" not in skipped_paths
 
 
 def test_snapshot_skips_symlinks(tmp_path, monkeypatch, capsys):

@@ -43,13 +43,17 @@ def run_watch(
             pending_state = current
 
         if pending_since is not None and now - pending_since >= debounce:
-            run_snapshot(config, reason="watch", push=push)
+            result = run_snapshot(config, reason="watch", push=push)
+            if result.message:
+                print(result.message, flush=True)
             previous = pending_state or current
             _write_watch_state(state, previous)
             pending_since = None
             pending_state = None
         elif state.has_pending() and pending_since is None:
             result = run_snapshot(config, reason="watch-pending", push=push)
+            if result.message:
+                print(result.message, flush=True)
             if not result.pending_recorded:
                 previous = scan_source_state(config)
                 _write_watch_state(state, previous)

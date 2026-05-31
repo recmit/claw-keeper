@@ -25,7 +25,7 @@ from .git import (
 from .matching import is_managed_repo_path, normalize_relative_path, path_to_posix, status_paths
 from .mirror import classify_path, skipped_entry
 from .policy import DEFAULT_PRUNE_PATHS
-from .risk import RiskFinding, has_high_risk, render_report, scan_tree, summarize_findings
+from .risk import RiskFinding, high_risk_paths, render_report, scan_tree, summarize_findings
 from .runtime import RuntimeState, SnapshotLock
 
 
@@ -127,10 +127,7 @@ def _run_snapshot_once(
     staging_root = _build_staging_tree(config, state)
     try:
         findings = scan_tree(staging_root, skip_prefixes=("manifests/",))
-        if has_high_risk(findings):
-            report_path = state.root / "last-risk-scan.md"
-            report_path.write_text(render_report(findings), encoding="utf-8")
-            raise SnapshotError("HIGH risk findings detected; refusing to commit. Report: {0}".format(report_path))
+        risk_skipped_paths = _skip_high_risk_files(staging_root, findings)
 
         if dry_run:
             files = _list_tree_files(staging_root)
@@ -138,7 +135,10 @@ def _run_snapshot_once(
                 committed=False,
                 changed_files=files,
                 dry_run=True,
-                message="dry run prepared {0} files; {1}".format(len(files), summarize_findings(findings)),
+                message="dry run prepared {0} files; {1}".format(
+                    len(files),
+                    summarize_findings(findings, skipped_high_risk_paths=risk_skipped_paths),
+                ),
             )
 
         _apply_staging_tree(config, staging_root)
@@ -147,13 +147,17 @@ def _run_snapshot_once(
     add_all(repo_path)
     changed = staged_name_status(repo_path)
     if not changed:
-        return SnapshotAttempt(committed=False, changed_files=[], message="no changes")
+        return SnapshotAttempt(
+            committed=False,
+            changed_files=[],
+            message=_message_with_risk_skips("no changes", risk_skipped_paths),
+        )
 
-    report_path = _write_repo_risk_report(repo_path, findings)
+    report_path = _write_repo_risk_report(repo_path, findings, risk_skipped_paths=risk_skipped_paths)
     add_all(repo_path)
     changed = staged_name_status(repo_path)
     changed_files = _changed_files_from_name_status(changed)
-    message_file = _write_commit_message(repo_path, reason, changed_files, findings, report_path)
+    message_file = _write_commit_message(repo_path, reason, changed_files, findings, report_path, risk_skipped_paths)
     commit_with_message(repo_path, message_file)
 
     push_attempted = False
@@ -170,7 +174,7 @@ def _run_snapshot_once(
         changed_files=changed_files,
         push_attempted=push_attempted,
         push_failed=push_failed,
-        message="committed {0} files".format(len(changed_files)),
+        message=_message_with_risk_skips("committed {0} files".format(len(changed_files)), risk_skipped_paths),
     )
 
 
@@ -289,6 +293,52 @@ def _write_manifest(
     manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def _skip_high_risk_files(staging_root: Path, findings: Sequence[RiskFinding]) -> List[str]:
+    skipped_paths = high_risk_paths(findings)
+    if not skipped_paths:
+        return []
+
+    skipped_entries = []
+    for relative in skipped_paths:
+        path = staging_root / relative
+        if not path.is_file() or path.is_symlink():
+            continue
+        markers = sorted({finding.marker for finding in findings if finding.level == "HIGH" and finding.path == relative})
+        skipped_entries.append(_risk_skipped_entry(path, relative, markers))
+        path.unlink()
+
+    if skipped_entries:
+        _update_manifest_for_risk_skips(staging_root, skipped_entries)
+    return [entry["path"] for entry in skipped_entries]
+
+
+def _risk_skipped_entry(path: Path, relative: str, markers: Sequence[str]) -> dict:
+    entry = {
+        "path": relative,
+        "reason": "high-risk-finding",
+        "kind": "file",
+        "risk_level": "HIGH",
+        "risk_markers": list(markers),
+    }
+    try:
+        entry["size"] = path.lstat().st_size
+    except OSError:
+        pass
+    return entry
+
+
+def _update_manifest_for_risk_skips(staging_root: Path, skipped_entries: Sequence[dict]) -> None:
+    manifest_path = staging_root / "manifests" / "latest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    skipped_paths = {entry["path"] for entry in skipped_entries}
+    manifest["files"] = [entry for entry in manifest.get("files", []) if entry.get("path") not in skipped_paths]
+    manifest["skipped"] = sorted(
+        list(manifest.get("skipped", [])) + list(skipped_entries),
+        key=lambda item: item["path"],
+    )
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
 def _apply_staging_tree(config: KeeperConfig, staging_root: Path) -> None:
     repo_path = Path(config.repo_path)
     for include in _managed_paths_for_cleanup(config):
@@ -326,11 +376,15 @@ def _copy_tree_contents(source: Path, destination: Path) -> None:
             shutil.copy2(str(item), str(target), follow_symlinks=False)
 
 
-def _write_repo_risk_report(repo_path: Path, findings: Sequence[RiskFinding]) -> Path:
+def _write_repo_risk_report(
+    repo_path: Path,
+    findings: Sequence[RiskFinding],
+    risk_skipped_paths: Sequence[str],
+) -> Path:
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     report_path = repo_path / "reports" / "{0}-risk-scan.md".format(timestamp)
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(render_report(findings), encoding="utf-8")
+    report_path.write_text(render_report(findings, skipped_high_risk_paths=risk_skipped_paths), encoding="utf-8")
     return report_path
 
 
@@ -340,6 +394,7 @@ def _write_commit_message(
     changed_files: Sequence[str],
     findings: Sequence[RiskFinding],
     report_path: Path,
+    risk_skipped_paths: Sequence[str],
 ) -> Path:
     lines = [
         "chore(agent-state): snapshot OpenClaw state",
@@ -353,7 +408,7 @@ def _write_commit_message(
         [
             "",
             "Risk notes:",
-            "- {0}".format(summarize_findings(findings)),
+            "- {0}".format(summarize_findings(findings, skipped_high_risk_paths=risk_skipped_paths)),
             "- Risk report: {0}".format(report_path.relative_to(repo_path).as_posix()),
             "",
         ]
@@ -371,6 +426,12 @@ def _changed_files_from_name_status(lines: Sequence[str]) -> List[str]:
         if len(parts) >= 2:
             files.append(parts[-1])
     return files
+
+
+def _message_with_risk_skips(message: str, risk_skipped_paths: Sequence[str]) -> str:
+    if not risk_skipped_paths:
+        return message
+    return "{0}; skipped high-risk files: {1}".format(message, len(risk_skipped_paths))
 
 
 def _list_tree_files(root: Path) -> List[str]:
