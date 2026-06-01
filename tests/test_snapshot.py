@@ -15,7 +15,15 @@ def init_fixture(tmp_path, monkeypatch, remote=None):
     config_path = tmp_path / "config.json"
     (source / "workspace").mkdir(parents=True)
     (source / "workspace" / "AGENTS.md").write_text("hello\n", encoding="utf-8")
-    args = ["init", "--source", str(source), "--repo", str(repo), "--config", str(config_path)]
+    args = [
+        "init",
+        "--source",
+        str(source),
+        "--repo",
+        str(repo),
+        "--config",
+        str(config_path),
+    ]
     if remote:
         args.extend(["--remote", remote])
     assert main(args) == 0
@@ -34,7 +42,9 @@ def test_snapshot_creates_first_commit(tmp_path, monkeypatch, capsys):
     assert (repo / "workspace" / "AGENTS.md").read_text(encoding="utf-8") == "hello\n"
     assert (repo / "manifests" / "latest.json").exists()
     assert list((repo / "reports").glob("*-risk-scan.md"))
-    assert "Snapshot reason: initial" in run_git(["log", "-1", "--pretty=format:%B"], repo)
+    assert "Snapshot reason: initial" in run_git(
+        ["log", "-1", "--pretty=format:%B"], repo
+    )
 
 
 def test_snapshot_without_changes_exits_cleanly(tmp_path, monkeypatch, capsys):
@@ -56,7 +66,9 @@ def test_snapshot_push_failure_keeps_local_commit(tmp_path, monkeypatch, capsys)
     _source, repo, config_path = init_fixture(tmp_path, monkeypatch, remote=remote)
     capsys.readouterr()
 
-    result = main(["snapshot", "--reason", "initial", "--push", "--config", str(config_path)])
+    result = main(
+        ["snapshot", "--reason", "initial", "--push", "--config", str(config_path)]
+    )
 
     captured = capsys.readouterr()
     assert result == 1
@@ -79,7 +91,9 @@ def test_snapshot_records_pending_when_lock_is_busy(tmp_path, monkeypatch):
     assert state.has_pending()
 
 
-def test_snapshot_runs_one_followup_for_pending_created_during_first_attempt(tmp_path, monkeypatch):
+def test_snapshot_runs_one_followup_for_pending_created_during_first_attempt(
+    tmp_path, monkeypatch
+):
     _source, _repo, config_path = init_fixture(tmp_path, monkeypatch)
     config = load_config(config_path)
     state = RuntimeState.for_repo(config.repo_path)
@@ -97,7 +111,9 @@ def test_snapshot_runs_one_followup_for_pending_created_during_first_attempt(tmp
     assert not state.has_pending()
 
 
-def test_snapshot_leaves_pending_created_during_followup_for_next_trigger(tmp_path, monkeypatch):
+def test_snapshot_leaves_pending_created_during_followup_for_next_trigger(
+    tmp_path, monkeypatch
+):
     _source, _repo, config_path = init_fixture(tmp_path, monkeypatch)
     config = load_config(config_path)
     state = RuntimeState.for_repo(config.repo_path)
@@ -122,10 +138,14 @@ def test_snapshot_refuses_dirty_unmanaged_repo_path(tmp_path, monkeypatch, capsy
     assert "dirty files outside managed paths" in captured.err
 
 
-def test_snapshot_skips_high_risk_files_without_blocking_snapshot(tmp_path, monkeypatch, capsys):
+def test_snapshot_skips_high_risk_files_without_blocking_snapshot(
+    tmp_path, monkeypatch, capsys
+):
     source, repo, config_path = init_fixture(tmp_path, monkeypatch)
     private_key_header = "-----BEGIN " + "OPENSSH PRIVATE KEY-----\n"
-    (source / "workspace" / "SECRET.md").write_text(private_key_header, encoding="utf-8")
+    (source / "workspace" / "SECRET.md").write_text(
+        private_key_header, encoding="utf-8"
+    )
 
     result = main(["snapshot", "--reason", "manual", "--config", str(config_path)])
 
@@ -135,7 +155,9 @@ def test_snapshot_skips_high_risk_files_without_blocking_snapshot(tmp_path, monk
     assert (repo / "workspace" / "AGENTS.md").exists()
     assert not (repo / "workspace" / "SECRET.md").exists()
 
-    manifest = json.loads((repo / "manifests" / "latest.json").read_text(encoding="utf-8"))
+    manifest = json.loads(
+        (repo / "manifests" / "latest.json").read_text(encoding="utf-8")
+    )
     skipped = {item["path"]: item for item in manifest["skipped"]}
     assert skipped["workspace/SECRET.md"]["reason"] == "high-risk-finding"
     assert skipped["workspace/SECRET.md"]["risk_level"] == "HIGH"
@@ -145,7 +167,9 @@ def test_snapshot_skips_high_risk_files_without_blocking_snapshot(tmp_path, monk
     assert "workspace/SECRET.md" in report
 
 
-def test_snapshot_allows_marker_names_without_secret_values(tmp_path, monkeypatch, capsys):
+def test_snapshot_allows_marker_names_without_secret_values(
+    tmp_path, monkeypatch, capsys
+):
     source, repo, config_path = init_fixture(tmp_path, monkeypatch)
     (source / "workspace" / "examples.md").write_text(
         "Document OPENAI_API_KEY and BEGIN OPENSSH PRIVATE KEY as literal examples only.\n",
@@ -172,13 +196,19 @@ def test_snapshot_skips_assigned_secret_values(tmp_path, monkeypatch, capsys):
     assert result == 0
     assert not (repo / "workspace" / "SECRET.md").exists()
 
-    manifest = json.loads((repo / "manifests" / "latest.json").read_text(encoding="utf-8"))
+    manifest = json.loads(
+        (repo / "manifests" / "latest.json").read_text(encoding="utf-8")
+    )
     skipped = {item["path"]: item for item in manifest["skipped"]}
     assert skipped["workspace/SECRET.md"]["reason"] == "high-risk-finding"
-    assert skipped["workspace/SECRET.md"]["risk_markers"] == ["OPENAI_API_KEY assignment"]
+    assert skipped["workspace/SECRET.md"]["risk_markers"] == [
+        "OPENAI_API_KEY assignment"
+    ]
 
 
-def test_snapshot_includes_file_again_after_high_risk_content_is_removed(tmp_path, monkeypatch, capsys):
+def test_snapshot_includes_file_again_after_high_risk_content_is_removed(
+    tmp_path, monkeypatch, capsys
+):
     source, repo, config_path = init_fixture(tmp_path, monkeypatch)
     secret_file = source / "workspace" / "SECRET.md"
     secret_file.write_text("OPENAI_API_KEY=sk-" + ("a" * 32) + "\n", encoding="utf-8")
@@ -191,9 +221,13 @@ def test_snapshot_includes_file_again_after_high_risk_content_is_removed(tmp_pat
 
     capsys.readouterr()
     assert result == 0
-    assert (repo / "workspace" / "SECRET.md").read_text(encoding="utf-8") == "safe note now\n"
+    assert (repo / "workspace" / "SECRET.md").read_text(
+        encoding="utf-8"
+    ) == "safe note now\n"
 
-    manifest = json.loads((repo / "manifests" / "latest.json").read_text(encoding="utf-8"))
+    manifest = json.loads(
+        (repo / "manifests" / "latest.json").read_text(encoding="utf-8")
+    )
     skipped_paths = {item["path"] for item in manifest["skipped"]}
     assert "workspace/SECRET.md" not in skipped_paths
 
@@ -215,11 +249,19 @@ def test_snapshot_uses_openclaw_text_first_policy(tmp_path, monkeypatch, capsys)
     source, repo, config_path = init_fixture(tmp_path, monkeypatch)
     (source / "openclaw.json").write_text('{"workspace":"ok"}\n', encoding="utf-8")
     (source / "agents" / "main" / "agent" / "codex-home").mkdir(parents=True)
-    (source / "agents" / "main" / "agent" / "codex-home" / "logs_2.sqlite-wal").write_bytes(b"db")
-    (source / "agents" / "main" / "notes.md").write_text("agent notes\n", encoding="utf-8")
+    (
+        source / "agents" / "main" / "agent" / "codex-home" / "logs_2.sqlite-wal"
+    ).write_bytes(b"db")
+    (source / "agents" / "main" / "notes.md").write_text(
+        "agent notes\n", encoding="utf-8"
+    )
     (source / "identity").mkdir()
-    (source / "identity" / "profile.md").write_text("public identity notes\n", encoding="utf-8")
-    (source / "identity" / "device-auth.json").write_text('{"token":"nope"}\n', encoding="utf-8")
+    (source / "identity" / "profile.md").write_text(
+        "public identity notes\n", encoding="utf-8"
+    )
+    (source / "identity" / "device-auth.json").write_text(
+        '{"token":"nope"}\n', encoding="utf-8"
+    )
     (source / "memory").mkdir()
     (source / "memory" / "reflection.md").write_text("memory notes\n", encoding="utf-8")
     (source / "flows").mkdir()
@@ -246,7 +288,9 @@ def test_snapshot_uses_openclaw_text_first_policy(tmp_path, monkeypatch, capsys)
     assert not (repo / "tasks" / "runs.sqlite-shm").exists()
     assert not (repo / "workspace" / "image.png").exists()
 
-    manifest = json.loads((repo / "manifests" / "latest.json").read_text(encoding="utf-8"))
+    manifest = json.loads(
+        (repo / "manifests" / "latest.json").read_text(encoding="utf-8")
+    )
     assert manifest["policy_version"] == 3
     skipped = {item["path"]: item["reason"] for item in manifest["skipped"]}
     assert skipped["agents/main/agent/codex-home"] == "excluded-pattern"
@@ -262,7 +306,18 @@ def test_snapshot_prunes_paths_from_legacy_broad_policy(tmp_path, monkeypatch, c
     (repo / "agents" / "main").mkdir(parents=True)
     (repo / "agents" / "main" / "old.log").write_text("old\n", encoding="utf-8")
     run_git(["add", "-A"], repo)
-    run_git(["-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "legacy broad mirror"], repo)
+    run_git(
+        [
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "legacy broad mirror",
+        ],
+        repo,
+    )
 
     result = main(["snapshot", "--reason", "prune", "--config", str(config_path)])
 

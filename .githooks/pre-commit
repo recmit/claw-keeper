@@ -1,0 +1,55 @@
+#!/bin/sh
+set -eu
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
+
+if ! command -v uv >/dev/null 2>&1; then
+  echo "pre-commit: uv is required to run checks." >&2
+  exit 1
+fi
+
+if git rev-parse --verify HEAD >/dev/null 2>&1; then
+  head_version=$(
+    git show HEAD:pyproject.toml |
+      awk -F '"' '/^version = / { print $2; exit }'
+  )
+  staged_version=$(
+    git show :pyproject.toml |
+      awk -F '"' '/^version = / { print $2; exit }'
+  )
+  staged_lock_version=$(
+    git show :uv.lock |
+      awk '
+        $0 == "[[package]]" { in_claw_keeper = 0 }
+        $0 == "name = \"claw-keeper\"" { in_claw_keeper = 1 }
+        in_claw_keeper && /^version = / {
+          gsub(/"/, "", $3)
+          print $3
+          exit
+        }
+      '
+  )
+
+  if [ -z "$staged_version" ] || [ -z "$staged_lock_version" ]; then
+    echo "pre-commit: could not read staged claw-keeper version." >&2
+    exit 1
+  fi
+
+  if [ "$staged_version" = "$head_version" ]; then
+    echo "pre-commit: bump the package version for this change." >&2
+    echo "pre-commit: update pyproject.toml and uv.lock before committing." >&2
+    exit 1
+  fi
+
+  if [ "$staged_lock_version" != "$staged_version" ]; then
+    echo "pre-commit: pyproject.toml and uv.lock version values differ." >&2
+    exit 1
+  fi
+fi
+
+echo "pre-commit: running scripts/check"
+for name in $(git rev-parse --local-env-vars); do
+  unset "$name"
+done
+scripts/check

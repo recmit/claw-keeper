@@ -8,7 +8,11 @@ from pathlib import Path
 from typing import Optional, Sequence
 
 from .matching import is_excluded
-from .policy import DEFAULT_MAX_TEXT_FILE_BYTES, DEFAULT_TEXT_EXTENSIONS, DEFAULT_TEXT_FILENAMES
+from .policy import (
+    DEFAULT_MAX_TEXT_FILE_BYTES,
+    DEFAULT_TEXT_EXTENSIONS,
+    DEFAULT_TEXT_FILENAMES,
+)
 
 
 @dataclass(frozen=True)
@@ -51,7 +55,11 @@ def skipped_entry(path: Path, relative_path: str, reason: str) -> dict:
     except OSError:
         return entry
     entry["size"] = stat.st_size
-    if reason in ("large-file", "non-text-extension", "non-text-content") and path.is_file() and not path.is_symlink():
+    if (
+        reason in ("large-file", "non-text-extension", "non-text-content")
+        and path.is_file()
+        and not path.is_symlink()
+    ):
         entry["sha256"] = _sha256(path)
     return entry
 

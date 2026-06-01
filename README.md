@@ -29,6 +29,24 @@ Public tool repository:
 git@github.com:recmit/claw-keeper.git
 ```
 
+## Development Workflow
+
+Install the tracked Git hooks once per checkout:
+
+```bash
+scripts/install-git-hooks
+```
+
+Run the full local check suite:
+
+```bash
+scripts/check
+```
+
+Every committed change should bump the package version in both `pyproject.toml`
+and `uv.lock`. The pre-commit hook enforces the version bump and runs the same
+check suite as CI.
+
 ## Create the Private History Repo
 
 Create a private GitHub repository for snapshots, for example:

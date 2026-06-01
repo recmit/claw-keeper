@@ -9,7 +9,10 @@ from typing import List, Pattern, Sequence, Tuple
 
 
 HIGH_PATTERNS: Tuple[Tuple[str, Pattern[str]], ...] = (
-    ("OPENAI_API_KEY assignment", re.compile(r"OPENAI_API_KEY\s*[:=]\s*['\"]?sk-[A-Za-z0-9_-]{16,}")),
+    (
+        "OPENAI_API_KEY assignment",
+        re.compile(r"OPENAI_API_KEY\s*[:=]\s*['\"]?sk-[A-Za-z0-9_-]{16,}"),
+    ),
     (
         "ANTHROPIC_API_KEY assignment",
         re.compile(r"ANTHROPIC_API_KEY\s*[:=]\s*['\"]?sk-ant-[A-Za-z0-9_-]{16,}"),
@@ -46,9 +49,15 @@ class RiskFinding:
 
 def scan_tree(root: Path, skip_prefixes: Tuple[str, ...] = ()) -> List[RiskFinding]:
     findings = []
-    for path in sorted(item for item in root.rglob("*") if item.is_file() and not item.is_symlink()):
+    for path in sorted(
+        item for item in root.rglob("*") if item.is_file() and not item.is_symlink()
+    ):
         relative = path.relative_to(root).as_posix()
-        if any(relative == prefix.rstrip("/") or relative.startswith(prefix.rstrip("/") + "/") for prefix in skip_prefixes):
+        if any(
+            relative == prefix.rstrip("/")
+            or relative.startswith(prefix.rstrip("/") + "/")
+            for prefix in skip_prefixes
+        ):
             continue
         findings.extend(scan_file(root, path))
     return findings
@@ -62,7 +71,7 @@ def scan_file(root: Path, path: Path) -> List[RiskFinding]:
         return []
     if b"\x00" in data[:4096]:
         return []
-    text = data[:1024 * 1024].decode("utf-8", errors="ignore")
+    text = data[: 1024 * 1024].decode("utf-8", errors="ignore")
     lowered = text.lower()
 
     findings = []
@@ -83,20 +92,33 @@ def high_risk_paths(findings: Sequence[RiskFinding]) -> List[str]:
     return sorted({finding.path for finding in findings if finding.level == "HIGH"})
 
 
-def summarize_findings(findings: Sequence[RiskFinding], skipped_high_risk_paths: Sequence[str] = ()) -> str:
+def summarize_findings(
+    findings: Sequence[RiskFinding], skipped_high_risk_paths: Sequence[str] = ()
+) -> str:
     if not findings:
         return "No credential-like markers found."
     counts = {}
     for finding in findings:
         counts[finding.level] = counts.get(finding.level, 0) + 1
-    summary = ", ".join("{0}: {1}".format(level, counts[level]) for level in sorted(counts))
+    summary = ", ".join(
+        "{0}: {1}".format(level, counts[level]) for level in sorted(counts)
+    )
     if skipped_high_risk_paths:
-        summary = "{0}; skipped high-risk files: {1}".format(summary, len(skipped_high_risk_paths))
+        summary = "{0}; skipped high-risk files: {1}".format(
+            summary, len(skipped_high_risk_paths)
+        )
     return summary
 
 
-def render_report(findings: Sequence[RiskFinding], skipped_high_risk_paths: Sequence[str] = ()) -> str:
-    lines = ["# Claw Keeper Risk Scan", "", summarize_findings(findings, skipped_high_risk_paths), ""]
+def render_report(
+    findings: Sequence[RiskFinding], skipped_high_risk_paths: Sequence[str] = ()
+) -> str:
+    lines = [
+        "# Claw Keeper Risk Scan",
+        "",
+        summarize_findings(findings, skipped_high_risk_paths),
+        "",
+    ]
     if skipped_high_risk_paths:
         lines.append("Skipped high-risk files:")
         for path in skipped_high_risk_paths:
@@ -105,6 +127,10 @@ def render_report(findings: Sequence[RiskFinding], skipped_high_risk_paths: Sequ
     if findings:
         lines.append("Findings:")
         for finding in findings:
-            lines.append("- {0}: {1} matched {2}".format(finding.level, finding.path, finding.marker))
+            lines.append(
+                "- {0}: {1} matched {2}".format(
+                    finding.level, finding.path, finding.marker
+                )
+            )
         lines.append("")
     return "\n".join(lines)

@@ -3,7 +3,14 @@ from pathlib import Path
 
 import pytest
 
-from claw_keeper.config import ConfigError, default_config_path, load_config, make_config, normalize_path, write_config
+from claw_keeper.config import (
+    ConfigError,
+    default_config_path,
+    load_config,
+    make_config,
+    normalize_path,
+    write_config,
+)
 from claw_keeper.policy import (
     DEFAULT_BRANCH,
     DEFAULT_EXCLUDE_PATTERNS,
@@ -104,7 +111,11 @@ def test_load_config_migrates_narrow_text_default_policy(tmp_path):
                 "repo_path": str(tmp_path / "repo"),
                 "branch": "raw-history",
                 "include_paths": list(NARROW_TEXT_INCLUDE_PATHS),
-                "exclude_patterns": ["agents/", "identity/", "workspace/old-generated-risk-exclude.md"],
+                "exclude_patterns": [
+                    "agents/",
+                    "identity/",
+                    "workspace/old-generated-risk-exclude.md",
+                ],
                 "remote": None,
                 "policy_version": 2,
             }
@@ -127,7 +138,9 @@ def test_load_config_rejects_missing_file(tmp_path):
 
 def test_load_config_rejects_invalid_shape(tmp_path):
     path = tmp_path / "config.json"
-    path.write_text(json.dumps({"source_path": "", "repo_path": "/tmp/repo"}), encoding="utf-8")
+    path.write_text(
+        json.dumps({"source_path": "", "repo_path": "/tmp/repo"}), encoding="utf-8"
+    )
 
     with pytest.raises(ConfigError, match="source_path"):
         load_config(path)
